@@ -7,4 +7,4 @@ I request, but do not require, that you notify me of modifications/ commercial u
 	orionchandler1@gmail.com
 
 Traceback:
-	Orion Chandler		2019-04-21	Initial release				github.com
+	Orion Chandler		2019-04-21	Initial release				www.github.com/a0r10n/MML6-compiler
