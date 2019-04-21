@@ -1,0 +1,305 @@
+#love colored master spark
+
+#pre
+#marisas main theme song
+#its very likely going to end up in the game
+
+#note: octaves span from A to A-
+@1  #Bass
+    I0.20   V$A.%0100   #H15
+@2  #Piano              #
+    I3.6    V$A.%0011   #H15
+@3  #Lead 1 (square)    #
+    I2.2    V$9.$0      #H15
+@4  #String             #
+    I2.2    V$2.%1111   #H15
+@5  #Lead 2 (sawtooth)  #
+    I2.9    V%1110.0    #H15
+@6  #Trumpet            #
+    I3.19   V$D.8       #H15
+@7  #Super Trumpet      #
+    I3.20   V$F.8       #H15
+
+@80 #Global Tempo
+    T169
+
+#Sweep example:
+
+#3/16 a measure...
+
+#3/16 mes/nt
+#16/3 nt/mes    (invert)
+#4/3 nt/bt      (* 1/4 mes/bt)
+#676/3 nt/min   (* 169 bt/min)
+#169/45 nt/sec  (* 1/60 min/sec)
+#45/169 sec/nt  (invert)
+#11520/169 t2   (* 256 sec/256ths)
+#t1 = -(t2-64)
+
+
+X1 #bass line but sometimes supermelody due to the sweep
+@80
+[0 :0 ^16 S0 O3 H0 @1
+    [1 :1
+        F F G+>C< F G+>C F  C<G+ F F  >C<G+ F >C<
+        D-F G+ D- F G+ D-G+ E-G>B-<E-  G>B-<E->B-<
+    ]3
+    [1 :1
+        [1 :1
+            FF>CC<
+        ]3
+        [1 :1
+            D-D-G+G+
+        ]3
+        [1 :1
+            E-E->B-B-<
+        ]3
+        [1 :1
+            FF>CC<
+        ]1
+        CCFG+E-FG>B-<
+    ]1
+    F8.3 >CC< FF >CC<  F4
+    D-8.3 G+G+D-D-G+G+ D-4
+    E-8.3 >B-B-<
+    [1 :1
+        E-E->B-B-<
+    ]1
+    [1 :1
+        FF>CC<
+    ]1
+    CCFG+E-FG>B-<
+    [1 :1
+        FF>CC<
+    ]3
+    [1 :1
+        D-D-G+G+
+    ]3
+    [1 :1
+        E-E->B-B-<
+    ]3
+    [1 :1
+        EE>B-B-<
+    ]1
+    EG>CEGEC<G
+    [1 :1
+        [1 :1
+            G->AD-G-D-A<
+        ]2
+        G->D-AG-D->A<D-A-D-G-D-AD-A<
+        [1 :1
+            DG->ADA<G-
+        ]1
+        DG->ADG-D>A<DA-DG-D A<A-G->A<E>A<D>A<
+        [1 :1
+            EA->BEB<A-
+        ]1
+        EA->BEA->AB<A-EA-EBEB<A->BEA->AB O3
+    ]1
+    ^32
+    D16 G-16 >ADEG->ADG->A R8      #Make these sweeps?
+    O3 E16 A-16 >BEG-A->BEG-A->B R
+    ^16
+    O3 D-G->AD-G->AD-G->AD-A<G-D-A<G-D-A<
+
+    @2
+    [1 :1
+        [1 :1
+            F+ F+ >A C+< F+ >A  C+ F+ C+ A<  F+ F+ >C+ A< F+ >C+<
+            D  F+ >A< D  F+ >A< D >A< E  G+ >B< E  G+ >B< E  >B<
+        ]3
+    @1
+    ]1
+    R1.2
+    [1 :1
+        [1 :1
+            [1 :1
+                G>A+DGDA+<
+            ]2
+            G>DA+GD>A+<D>A<DGDA+DA+<
+            [1 :1
+                D+G>A+D+A+<G
+            ]1
+            D+G>A+D+GD+>A+<D+>A<D+GD+ A+A<G>A+<E+>A+<D+>A+<
+            [1 :1
+                E+>AB+E+B+A<
+            ]1
+            E+>AB+E+>AA+B+A<E+>A<E+B+E+B+AB+E+>AA+B+ O3
+        ]1
+    @2
+    ]1
+    #Two measure switch to melody support
+    ^8 O5 @6
+    B- C D R C D F G16.15
+    S5.%1111 H19 G16.3
+]0
+X2  #Bass, harmony
+@80
+[0 :0 ^1 O4 S0 H0 @3
+    [1 :1
+        A- A-4 A-4 > B-4 C4 < A- F4 A-16.3 > B-16.3 < A-8 G8 > D-8 <
+    ]
+    O3 @4
+    [1 :1
+        FD-E-F
+    ]2
+    FD-E-C
+    [1 :1
+        F+.2 D.2 E.2
+    ]
+    D8.3 R8 E8.3 F+8.9
+    O5 @3
+    [1 :1
+        A1 A4 A4 B4 C+4 A1 <F+4> A16.3 B16.3 A8 <A-8> D8
+    ]1
+    O3 @4
+    [1 :1 ^1
+        F+ D2 E2
+    ]2
+    F+ D2 E8.3
+    R C+
+    G8.17
+    [1 :1
+        E-.2 F.2 G.2
+    ]2
+    E-.2 F.2 E-8.3 R8 F8.3 G8.9
+]0
+
+X3  #Melody
+@80 ^4
+[0 :0 O5 @5
+    [1 :1
+        C1 C F G A-
+    ]3
+    @6
+    [1 :1
+        ^8 C E- F R
+    ]1
+    C E- F C16 R16 A- G32 A-32 G16 F E-
+    [1 :1
+        B- C E- R
+    ]1
+    C E- F C16 R16 > C B-32 C32 B-16 < A- G
+    [1 :1
+        ^8 C E- F R
+    ]1
+    C E- F C16 R16 A- G32 A-32 G16 F E-
+    B- C < A- R G R E- R F C G C A-16.3 R16 
+    A- > B- C.6 B- E- F.5 C G A- G.4 E-.2 F.2 C.5 R
+    C E- F.6 C E- F.5
+    C G A- G.4 A-.2 > B-.2 C.4
+    @5
+    [1 :1
+        C16 B-16
+    ]1
+    < A- G 
+    [1 :1
+        F+ G+ >A< R G+ F+ E F+.6
+        [1 :1
+            C+ F+
+        ]1
+           G+ >A< R G+ F+ E > C+.6 B A < G+
+        F+ G+ >A< R G+ F+ E > C+.2
+        [1 :1
+            B A
+        ]1
+        < G+ F+ E
+    ]1
+    > A B C+ R B C+ E F+.9
+    @3
+    [1 :1
+        [1 :1 O5 ^4
+            D-1 D- G- A- >A
+        ]2
+        @7
+    ]1
+    A1 A A B C+ A1 <F+> A16.3 B16.3 A8 <A-8> D8
+    R1.2 <
+    @5
+    [1 :1
+        [1 :1 ^8
+            G >A B- R A< G F  G.6
+            [1 :1
+                D G
+            ]1
+            >A B- R A< G F >D.6 C B- A <
+            G >A B- R A< G F >D.2 [1 :1 C B- ]1 A < G F
+            V$C0
+        ]1
+        @3
+    ]1
+    G >A B- R A< G F G.9
+]0
+#Percussion
+X4
+@80 O2
+^16
+[0 :0
+    [8 [9 ]0 :8
+        [4 :4
+            E8  C+8  B C C+8  A8  C+8  B C C+8
+            [3 [2 ]0 :3
+                A C C+8  B C C+8  A8  C+8  B C C+8
+            :2  A8  C+8  B C C+8  A C C+8  B A B B
+            ]1
+        ]1
+    
+        [3 [2 ]0 :3
+            E4       A C B8   A C C+8  B A B B  #20
+        :2  E4       C C B8   B8  C+8  B C C+8
+        ]1
+        [3 [2 ]0 :3
+            E8  C+8  B C C+8  A8  C+8  B C C+8
+        :2  A8  C+8  B C C+8  A C C+8  B A B B
+        ]1
+        A C C+8  B C C+8  A8  C+8  B C C+8  #25
+        B-4      B C F8   G+ G16.3 [1:1 G+32 ]7
+        [3 :3
+            [2 [4 ]0 :2
+                A8  B8   A A B C  A8  B C  A A B A
+            :4  E8  B8   A A B C  A A B8   A C B A
+            ]2
+            E8  D8   D A D C  D8  D C  D B D B
+        ]1
+        E8  C+8  A A B C  E A B8   A C E D
+        D8  D8   A A D C  A8  D C  A A D D  #40
+
+    :9  A C C+8  C C C+8  A8  C+8  C C C+8
+        A8  C+8  C C C+8  A C C+8  C8  C+8
+        A C C+8  A C C+8  A8  C+8  A8  C+8
+        A8  C+8  A C C+8  A8  C+8  A8  B-8
+        [3 [2 ]0 :3
+            A8  C+8  B C C+B  A C C+8  B8  C+8
+        :2  E8  C+8  B C C+B  A B C+8  A C B C
+        ]1
+        D+1
+    ]1
+
+    [2 :2
+        E8  B8   A A B C  A A B8   A C B A
+        A8  B8   A A B C  A8  B C  A A B A  #50
+    ]2
+    E8  C+8  A A B C  E A B8   A C E D  #55
+    D8  D8   A A D C  A8  D C  A A D D
+    B16.3 C  C C B8   B16.3 B8   C D+8.7
+                          [1:1 G+32 ]7
+    [3 [4 ]0 :3
+        E8  B8   A A B C  A A B8   A C B A
+        E8  D8   D A D C  D8  D C  D B D B
+    :4  [2 :2
+            E8  B8   A A B C  A A B8   A C B A  #65
+            A8  B8   A A B C  A8  B C  A A B A
+        ]1
+    ]1
+    [5 [4 ]0 :5
+        [3 :3
+            [2 [1 ]0 :2
+                A8  B8   A A B C  A8  B C  A A B A
+            :1  E8  B8   A A B C  A A B8   A C B A
+            ]2
+            E8  D8   D A D C  D8  D C  D B D B
+        ]1
+    :4  E8  C+8  A A B C  D+1
+        [1:1 G+32 ]15
+    ]1
+]0

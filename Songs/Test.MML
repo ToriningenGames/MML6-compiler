@@ -1,0 +1,44 @@
+^0
+X1 T120 V$F3 H0 O4
+[:
+    I0. E4
+    I1. G4
+    I2. A4
+    I3. C4
+]
+X2 T120 V$FF O4
+[:          H00
+    I0. A4  H10
+    I1. C4  H20
+    I2. E4  H30
+    I3. G4  H40
+]
+X3 T120 I0 O4 V$C.
+[:
+    V0. A4
+    V1. B4
+    V2. C4
+    V3. D4
+    V4. E4
+    V5. F4 >
+    V6. G4
+    V7. A4
+    V8. B4
+    V9. C4
+    V10. D4
+    V11. E4
+    V12. F4 <
+    V13. A4
+    V14. C4
+    V15. E4
+]
+X4 T120
+[: ^4
+    A
+    B-B
+    C
+    D-D
+    E-E
+    F
+    G-GG+
+]0

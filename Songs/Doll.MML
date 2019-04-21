@@ -1,0 +1,41 @@
+# Alice alone
+# Original: 人形裁判　～ 人の形弄びし少女
+
+@0 T132
+
+X1
+    R18
+X2 @0 I2 S0 H0
+[0:0 O4 V$A4
+    F2   >C4  B-4 C2   F2    E2    D2      C2   B2
+    A4.3     <A-4 G-2 >D-2   C4.3      C2  B-4 <A-4 G4
+    F2   >C4  B-4 C2   F2    E2    D2      C2   B2
+    A4.3     <A-4 G-2 >D-2   C4.3      C2  B-4 <A-4 G8 F16 G16
+    A-4.3     R8 G16 A-16   >B-2   E-2 C2.3     C4 E-4
+    F2 F4     A-4 G8.3 E-8.3 B-4 <A-8.3> B-8.3 C4 <G2 G16.3 A-16.3 >B-8<
+    A-4.3 R8 G16 A-16 >B-2 E-2 F1 R8 A-8 G4 F16.3 C16.3 E-2
+          D-8.3 B-4 E8.3 F8.3 G4 G8.3 F8.5 R8.3
+  ^16 O6 A-G E- B- < A-G E- B- < A-G
+   ^4 V$94 [1:1 O5 C <G A- F V$85 ]1 V$75 O5 [1:1 E B C A V$66 ]1
+   V$56 [1:1 C+ < G+ > A < F+ > V$47 ]1 V$37 F B- C <F> V$27 E B- C < G
+   V$18 F1
+   [:R2]0
+]0
+^0
+X3 @0 V$90
+[: O3 I2.23
+    [3 :3
+        F2  F4  G4  G+2 >C2 A2 A4 B4 C2      E2 <
+        G-2 G-4 A-4 >A2 D-2 C1       C4 B-4 <A-4 G4
+    ]1 ^8
+    I2.2
+    [:FA->C<A-]1 [:E-G>C<G]1  [:DF>B-<F]3
+    [:D-F>D-<F]1  [:E-G>E-<G]1 [:D-A->F<A-]1 [:E>B-GB-<]1
+    [:F>CA-C<]1   [:E->CGC<]1  [:D>B-FB-<]3
+    [:B-F>B-<F]1  [:CG>E<G]1   [:D-A->F<A-]1 E-1 I2.23
+    F2  F4  G4  G+2 >C2 A2 A4 B4 C2      E2 <
+    G-2 G-4 A-4 >A2 D-2 C1       C4 B-4 <A-4 G4
+    F1
+    [:R2]0
+^0]
+X4T1[:R1]

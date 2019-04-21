@@ -1,0 +1,165 @@
+//Memory light interpreted MML format
+/*
+ * Binary entry format
+ * %TTTTxxxx
+ *  ||||++++--- subspecifier
+ *  ++++------- Type
+ * 
+ * Types between 4-15 are notes:
+ *      The value is the number of half-steps above the base note of the current octave, plus 4
+ *      The subspecifier is a reference to the note's length, set via the length table setter
+ *      And so on.
+ * Other things to accomodate:
+ *    > Rests
+ *    > Volume
+ *      Tone (duty/wave)
+ *    > Octave control
+ *      Loops
+ *      Sweep
+ *      Envelope
+ *      Panning?
+ *      End of song?
+ * 
+ * Calculating pitch based on a general octave sounds like precision hell, so
+ * Look up table! Octave can be multiplied by 12 and shifted by the size of a pitch
+ * Then, each note could be shifted+added in, referencing a pitch
+ * The pitch table base could additionally be configurable, allowing any pitch sets
+ * 
+ * Length: Stored as however many 256ths of a measure a given length is
+ *      16 locations to store this in
+ * Loops will save the length state and replace it on looping, so it is known
+ *     after setting a loop point
+ * Optimisation technique:
+ *      Decide which note lengths to override based on proximity: go for the note 
+ *      length that's furthest away from here
+ * 
+ * Remaining types:
+ *      0: Other
+ *          Subspecifier type:
+ *              1xxx: Loop
+ *                  xxx: Loop index
+ *                  Byte data: Hi bit: setloop/ goto
+ *                      If setloop, unsigned offset from loop directive to destination
+ *                      If goto, number of times to loop. 0 indicates infinite looping
+ *              01xx: Tone change
+ *                  xx: Channel 1/2 duty
+ *                  Byte data: Channel 3 wave index
+ *              0011: Tempo change
+ *                  Byte data: magnitude, 0 to append next note
+ *              0010: Auto Length (for stacatto)
+ *                  Byte data: value to set Counter to, 0 to disable
+ *                      High two bits omitted when not channel 3
+ *              0001: Envelope
+ *                  Byte data: Envelope data
+ *              0000: Sweep
+ *                  Byte data: Sweep data
+ *      1: Length change
+ *          Subspecifier: Length index to change
+ *          Byte data: New length value
+ *      2: Octave
+ *          Subspecifier: Octave no.
+ *      3: Rest
+ *          Subspecifier: length
+ * 
+ * Header format:
+ * Header specifies the tables used during playback
+ * ? For all channels:
+ * ? 2 bytes -> Note tone table
+ * ? For each channel:
+ * ? 2 bytes -> Note pitch table
+ * Those could be separate from the realtime reader (aka preloaded)
+ * For each channed:
+ * 2 bytes =  Channel start offset
+ */
+/*
+    read in the source file
+        convert the text into tokens
+    Tokens get stored in a linked list, with metadata
+    From high priority to low priority, work with every directive
+    When done, output to file.
+
+*/
+/*
+MML text format:
+All entries are a character with a number following. Valid characters are:
+    A-G:    Note declaration
+    R:      Rest
+    V:      Volume
+    S:      Sweep
+    T:      Tempo
+    O:      Octave
+    I:      Instrument
+    H:      Stacatto
+    []:     Loop
+    X:      Channel
+    ^:      Imply
+    @:      Macro
+    
+Numbers immediately follow valid characters, no space, in one of these formats:
+    [0-9]:      Decimal literal
+    %[0-1]:     Binary literal
+    $[0-9A-F]:  Hexadecimal literal (requires trailing whitespace)
+    .:          Special character between numerical literals. Allows specificity
+The dot character takes precedance over base specifiers i.e. '$F.13' is equal to '15.13'
+
+Meanings:
+    #: Comment string. Continues until end of line
+    A-G: At the current octave, play a note of this pitch.
+        Should the character following be a + or a -, the note shall be sharp or flat, respectively.
+        The numeral following specifies length as the denominator of the note
+        e.g. C4 plays a quarter note at the pitch of C
+        A dot following is similar to a tie, or a dotted note, in that it specifies the numerator of the played note
+        e.g. D8.3 plays a dotted quarter note, or three tied eighth notes
+    R: Rest. Plays silence
+        Numerals following are the same as any of A-G.
+    V: Envelope setting
+        Numeral following is the value to feed into the envelope register. If channel 3, the top two bits of volume are taken and fed into channel shifting, with reasonable adjustment.
+        A dot following allows specifying volume magnitude and shift separately
+        e.g. V15.0 sets volume to maximum with no envelope
+    S: Sweep setting
+        Numeral following is the value to feed into the sweep register. If not channel 1, this directive is ignored.
+        A dot following allows specifying the time and the magnitude seperate
+        e.g. S$77 sets sweep to a slow descent
+    T: Tempo setting
+        Numeral following is the new tempo, in BPM. Maximum BPM is 255
+    O: Set Octave
+        Numeral following is the new octave, as per the octave table set in the header.
+    I: Set instrument
+        Numeral following is the wave duty to switch to, or a channel 3 wave index. If channel 4, this directive is ignored. A dot with a numeral following specifies a seperate index for channel 3.
+    H: Set actual note length (stacatto)
+        Numeral following is the value fed into the Sound Length register. When this value is 0, Sound Length disabled
+    [: Loop Start
+        Numeral following is a label ID to loop back to.
+        A dot following allows specifying the particular index to loop with.
+    ]: Loop Go
+        Numeral following is the number of times to loop. When this value is 0, loop forever.
+        Loop brackets are linked by nearest pair based on actual location
+        A dot following allows specifying the particular index to loop with.
+    :: Loop Label
+        Numeral following is an ID for this label.
+        This is the loop destination for preceding loop starts having a matching ID
+    X: Channel start
+        Defines at what directive a given channel should start playing
+        Numeral following is which channel is now beginning.
+    ^: Imply
+        Numeral following is what numeral follows directives that have no numeral after them. This applies to ALL directives (except shifts)!
+    @: Macro
+        Allows substitution of commonly-used phrases of music.
+        Numeral following is the macro identifier.
+        Macros may not be recursive
+        Implications are done before macro substitution
+        Macros are defined before all channels. Therefore, channels may not start within macros.
+        Macros are terminated with another macro declaration or a channel declaration
+        An optional dot and numeral indicate a number of directives to skip in reading/ pasting
+            Note: Implys are not counted in this number
+    <>: Octave shift
+        Statically move down/up an octave, respectively. Equivalent to an O directive
+        An optional numeral following specifies how many octaves to shift
+Note on loops:
+    A given bracket pairs with the nearest matching bracket i.e. all loops are fully contained
+    If one of these has an index specification and the other doesn't, the other inherits that index
+    However, if both brackets have index specifications, neither are overwritten
+    This is so that you can have overlapping loops, but you are responsible for index allocation
+    Compilers will also assume fully contained loops, so anything affected by looping (e.g. GB's length messages) will be screwed over
+    Additionally, setting index to max is invalid
+*/

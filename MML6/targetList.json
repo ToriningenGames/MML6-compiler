@@ -1,0 +1,3 @@
+{pt_self, writeMML_self, "self"},
+{pt_gameboy, writeMML_gb, "gb"},
+{pt_none, writeMML_none, "none"},
