@@ -1,5 +1,5 @@
 
-MML6.exe -i=%1 -o=../Song.mcs -t=gb
+MML6.exe -i=%1 -o=Song.mcs -t=gb
 @if /I "%ERRORLEVEL%" NEQ "0" (
 	@PAUSE
 	@exit
