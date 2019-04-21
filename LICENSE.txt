@@ -1,0 +1,10 @@
+Permission is hereby given to anyone to use this software and data for any purpose, provided the following restrictions:
+ - This text document, in its entirety, is retained, with no omissions or edits on the existing text.
+ - An entry be appended to the end of this text document in the following format:
+	Name			Date		Use/Modification			Link to product
+
+I request, but do not require, that you notify me of modifications/ commercial use of this software or data, at the following address:
+	orionchandler1@gmail.com
+
+Traceback:
+	Orion Chandler		2019-04-21	Initial release				github.com
