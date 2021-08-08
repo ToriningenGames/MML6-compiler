@@ -1,23 +1,34 @@
-DEMOSONG=Song.mml
+DEMOSONG=Test
+CC=cc
 
-OBJ=musPlayer.obj
-LINK=Link.link
+vpath %.asm .\musPlayer
+vpath %.mml .\Songs
+vpath %.obj .\$(OBJDIR)
 
-vpath %.asm musPlayer
-vpath %.mml Songs
+OBJDIR=obj
+OBJ=$(OBJDIR)\musPlayer.obj
+LINK=$(OBJDIR)\Link.link
+SONGTARGET=$(OBJDIR)\Song.mcs
 
-demo: $(LINK) $(OBJ)
+demo : $(LINK) $(SONGTARGET) $(OBJ) | $(OBJDIR)
 	wlalink -v -S -r $(LINK) musPlayer.gb
 
 $(LINK) : Makefile
 	$(file > $(LINK),[objects])
-	$(foreach I, $(OBJ),$(file >> $(LINK), obj/$(I)))
+	$(foreach I, $(OBJ),$(file >> $(LINK), $(I)))
 
-%.obj : %.asm
-	wla-gb -v -o $@ $<
+$(OBJDIR)\\%.obj : %.asm | $(OBJDIR)
+	wla-gb -v -I $(OBJDIR) -I musPlayer -o $@ $<
 
-%.mcs : %.mml
-	MML6 -i=$< -o=$@ -t=gb
+$(SONGTARGET) : $(addsuffix .mml,$(DEMOSONG)) MML6\MML6 | $(OBJDIR)
+	MML6\MML6 -i=$< -o=$@ -t=gb
 
-MML6 :
-	cd MML6; make
+MML6\MML6 :
+	cd MML6 && make CC=$(CC)
+
+$(OBJDIR) :
+	mkdir $@
+
+clean :
+	rmdir /S /Q obj
+	del /S /Q musPlayer.gb musPlayer.sym

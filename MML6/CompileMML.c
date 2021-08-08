@@ -52,7 +52,7 @@ extern int          writeMML(MMLStruct* intree, FILE* outfile, enum platform for
 extern MMLStruct*   processMML(MMLStruct* intree);
 
 void closeInput(struct args* list);
-void openOutput(struct args* list);
+void openOutput(FILE* code, struct args* list);
 
 
 int main(int argc, char** argv) {
@@ -70,9 +70,13 @@ int main(int argc, char** argv) {
     MMLStruct* musData = readMML(MAINARGS->infile[0]);
     closeInput(MAINARGS);
     musData = processMML(musData);
-    MAINARGS->outfile[0] = tmpfile();
-    int resCode = writeMML(musData, MAINARGS->outfile[0], MAINARGS->target);
-    openOutput(MAINARGS);
+    FILE* output = tmpfile();
+    if (!output) {
+        perror("Error writing output");
+        return -1;
+    }
+    int resCode = writeMML(musData, output, MAINARGS->target);
+    openOutput(output, MAINARGS);
     return resCode;
 }
 
@@ -211,8 +215,7 @@ void closeInput(struct args* list) {
 
 #define CPYBUFSIZ 1024
 //Copy a temoprary file to real outputs
-void openOutput(struct args* list) {
-    FILE* code = list->outfile[0];  //The actual results
+void openOutput(FILE* code, struct args* list) {
     rewind(code);
     void* buf = malloc(BUFSIZ);
     for (int i = 0; list->outname[i]; i++) {
