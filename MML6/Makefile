@@ -1,39 +1,41 @@
-DEL := del
-DFLAGS := -Wall -Wextra -Wno-implicit-fallthrough -Og -g3
-RFLAGS := -O1 -DNDEBUG
-CCFLAGS := --std=c11 -c 
-LDFLAGS :=  
-ONAME := a.out
-#Where the source files are
-SRCPRE := .\\
-#Where the output should go
-DSTPRE := .\\
-DEBUGPRE := debug-
-#The name of the output compiler
-DST := MML6.exe
+OBJDIR=obj/
+BINDIR=bin/
+SRCDIR=src/
+CFLAGS= --std=c11 -c
+RFLAGS= -O1 -DNDEBUG
+DFLAGS= -Wall -Wextra -Wno-implicit-fallthrough -Og -g3
+BIN=MML6.exe
+TARGETSRC=MML_MML MML_gb
+CORESRC=CompileMML MMLCore1 Optimise
+SRC=$(CORESRC) $(TARGETSRC)
+CC=cc
 
-#Add your source file here
-TARGETLIST := MML_MML.c MML_gb.c
-OBJLIST := $(TARGETLIST:.c=.o)
-CORELIST := CompileMML.o MMLCore1.o Optimise.o
+vpath %.c $(SRCDIR)
 
-all: | target target-core
-debug: | target-debug target-core
+.SUFFIXES:
 
-target:
-	$(eval CCFLAGS := $(CCFLAGS) $(RFLAGS))
-	$(eval DEBUGPRE := )
-	$(eval ONAME := $(DSTPRE)$(DST))
-	$(eval TARGETS := $(CORELIST) $(OBJLIST))
-%.o: %.c
-	$(CC) $(CCFLAGS) $(SRCPRE)$*.c -o $(DEBUGPRE)$*.o
-target-debug:
-	$(eval CCFLAGS := $(CCFLAGS) $(DFLAGS))
-	$(eval ONAME := $(DSTPRE)$(DEBUGPRE)$(DST))
-	$(eval TARGETS := $(addprefix $(DEBUGPRE),$(CORELIST) $(OBJLIST)))
-target-core: $(CORELIST) $(OBJLIST)
-	$(CC) $(LDFLAGS) $(TARGETS) -o $(ONAME)
-clean:
-	$(DEL) $(CORELIST) $(OBJLIST)
-	$(eval TARGETS := $(addprefix $(DEBUGPRE),$(CORELIST) $(OBJLIST)))
-	$(DEL) $(TARGETS)
+.PHONY : all release debug clean common
+
+all : release debug
+
+release : CFLAGS:=$(CFLAGS) $(RFLAGS)
+release : PRE:=
+release :
+	$(MAKE) '$(BINDIR)$(BIN)' CFLAGS='$(CFLAGS)'
+
+debug : CFLAGS:=$(CFLAGS) $(DFLAGS)
+debug : PRE:=debug-
+debug :
+	$(MAKE) '$(BINDIR)$(PRE)$(BIN)' CFLAGS='$(CFLAGS)' PRE='$(PRE)'
+
+$(BINDIR)$(PRE)$(BIN) : $(addprefix $(OBJDIR)$(PRE),$(addsuffix .o,$(SRC)))
+	$(CC) $^ -o $@
+
+$(OBJDIR)$(PRE)%.o : %.c
+	$(CC) $(CFLAGS) $< -o $@
+
+bin obj :
+	mkdir $@
+
+clean :
+	del /S /Q bin obj

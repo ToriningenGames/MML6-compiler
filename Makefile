@@ -13,7 +13,7 @@ SONGTARGET=$(OBJDIR)\Song.mcs
 demo : $(LINK) $(SONGTARGET) $(OBJ) | $(OBJDIR)
 	wlalink -v -S -r $(LINK) musPlayer.gb
 
-$(LINK) : Makefile
+$(LINK) : Makefile | $(OBJDIR)
 	$(file > $(LINK),[objects])
 	$(foreach I, $(OBJ),$(file >> $(LINK), $(I)))
 
