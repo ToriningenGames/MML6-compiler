@@ -4,7 +4,7 @@
 
 .MEMORYMAP
 SLOTSIZE $4000
-DEFAULTSLOT 1
+DEFAULTSLOT 0
 SLOT 0 $0000
 SLOT 1 $4000
 .ENDME
@@ -377,40 +377,24 @@ SongLoop:
   LD (HL),$13
 +
 ;For each channel
-    ;Read channel state from $C200
+    ;Read old channel state from $C200
+    ;Compare with live state
 ;Channel 1
-  LD HL,$C200
-  LD DE,$C300
-  LD A,(DE)     ;Old Envelope
-  LD B,A
-  INC E
-  LD A,(DE)     ;Old Stacatto
-  INC E
-  LD C,A
-  LD A,B
-  CP (HL)   ;Env changed
-  JR nz,+
+  LD HL,$C210
+  LDH A,($12)   ;current Envelope
+  CP (HL)
+  JR nz,+       ;Env changed
   INC L
-  LD A,C
-  CP (HL)   ;Stacatto changed
-  JP z,++
+  LD A,(channelonebase+$31)     ;current Stacatto
+  CP (HL)
+  JP z,++       ;Stacatto didn't change
   DEC L
-+
-  INC L ;Alignment
-  LDD A,(HL)
-  DEC E
-  LD (DE),A
-  DEC E
-  LDI A,(HL)
-  LD (DE),A
-  INC E
-  INC E
-  PUSH HL
-  PUSH DE
-;New envelope/stacatto
-  DEC HL
-  ;$C200: CH1 Envelope
-  LD B,(HL)
++       ;New waveform
+  LDH A,($12)   ;New Envelope
+  LDI (HL),A
+  LD A,(channelonebase+$31)     ;New Stacatto
+  LD (HL),A
+  LD B,A
   LD HL,$C400
   LD A,$07
   LD C,64
@@ -429,23 +413,23 @@ SongLoop:
   LD A,$F0
   AND B
   SWAP A
-  PUSH DE
+    PUSH DE
 -
-  LDI (HL),A
-  DEC E
-  JR nz,+
-  POP DE
-  PUSH DE
-  ADD D
-  BIT 4,A   ;Overflow checks
-  JR z,+
-  SUB D
+    LDI (HL),A
+    DEC E
+    JR nz,+
+    POP DE
+    PUSH DE
+    ADD D
+    BIT 4,A   ;Overflow checks
+    JR z,+
+    SUB D
 +
-  DEC C
-  JR nz,-
-  POP DE
+    DEC C
+    JR nz,-
+    POP DE
   ;Get stacatto point
-  LD A,($C201)  ;CH1 Stacatto
+  LD A,(channelonebase+$31)  ;CH1 Stacatto
   OR A  ;Don't draw if disabled
   JR z,+
   ;Dot equation: 16-A/4
@@ -471,7 +455,7 @@ SongLoop:
   CPL
   AND $0F   ;0-15 -> (16-1) minus 1
   LD C,A
-  LD A,(DE)
+  LDH A,($12)
   CP C      ;Carry clear if pixel gets drawn here
   CCF
 ;Clears carry if stacatto says so.
@@ -570,42 +554,54 @@ SongLoop:
   JR ---
 
 +++++
-  POP DE
-  POP HL
 ++
-  INC L
-  LD A,(DE)     ;Old Wave
+  LD HL,$C213   ;Old wave
+  LDH A,($11)   ;Curr Wave
   CP (HL)
   JR z,+
 ;New wave
+  LD (HL),A
   LD BC,$C008
-  LD A,(HL)
-  LD (DE),A
-  AND $03
-  RLCA
+  AND $C0
+  SWAP A
+  RRCA
   ADD $64
   LD (BC),A
   INC C
   INC A
   LD (BC),A
 +
-  INC E
   INC L
-  LD A,(DE)     ;Old note
-  CP (HL)
+  LDH A,($81)   ;New note
+  CP (HL)       ;Old note
   JR z,+
 ;New note
+  LD (HL),A
+  ;Get octave
+  LD A,(channelonebase+$2C)
+  LD C,A        ;Go to half steps from base
+  ADD A   ;*2
+  ADD C   ;*3
+  ADD A   ;*6
+  ADD A   ;*12
+  LD C,A
   LD A,(HL)
-  LD (DE),A
+  SWAP A
+  AND $0F
+  SUB $04
 ;"Note" is half steps from table base
 ;Or $F9 for a rest (auto-pushes to offscreen)
 ;Position: (N) * 2 + 14
 ;Sprite: LUT + N % 12
+  ADD C
   RLCA
-  ADD 7-24
+  ADD 8
   LD ($C101),A
   LD BC,NoteLUT
   LD A,(HL)
+  SWAP A
+  AND $0F
+  SUB $04
 -
   SUB 12
   JR nc,-
@@ -624,37 +620,22 @@ SongLoop:
   INC E
   INC L
 ;Channel 2
-  LD A,(DE)     ;Old Envelope
-  LD B,A
-  INC E
-  LD A,(DE)     ;Old Stacatto
-  INC E
-  LD C,A
-  LD A,B
-  CP (HL)   ;Env changed
-  JR nz,+
+  LD HL,$C220
+  LDH A,($17)   ;current Envelope
+  CP (HL)
+  JR nz,+       ;Env changed
   INC L
-  LD A,C
-  CP (HL)   ;Stacatto changed
-  JP z,++
+  LD A,(channeltwobase+$31)     ;current Stacatto
+  CP (HL)
+  JP z,++       ;Stacatto didn't change
   DEC L
-+
-  INC L ;Alignment
-  LDD A,(HL)
-  DEC E
-  LD (DE),A
-  DEC E
-  LDI A,(HL)
-  LD (DE),A
-  INC E
-  INC E
-  PUSH HL
-  PUSH DE
-;New envelope/stacatto
++       ;New waveform
   ;Write every vertical pixel strips's envelope height, in order
-  DEC HL
-  ;$C204: CH2 Envelope
-  LD B,(HL)
+  LDH A,($17)   ;New Envelope
+  LDI (HL),A
+  LD A,(channeltwobase+$31)     ;New Stacatto
+  LD (HL),A
+  LD B,A
   LD HL,$C500
   LD A,$07
   LD C,64
@@ -702,7 +683,7 @@ SongLoop:
   JR nz,-
   POP DE
   ;Get stacatto point
-  LD A,($C205)  ;CH2 Stacatto
+  LD A,(channeltwobase+$31)  ;CH2 Stacatto
   OR A  ;Don't draw if disabled
   JR z,+
   ;Dot equation: 16-A/4
@@ -726,7 +707,6 @@ SongLoop:
     ;Stacatto point     (B) (preserve!)
   ;Pointers:
     ;Tile data (HL)
-    ;Envelope data (DE)
 ;Order for bits?
   ;Please keep HL consistent; it's a pain to move around
     ;HL increments
@@ -746,7 +726,7 @@ SongLoop:
   CPL
   AND $0F   ;0-15 -> (16-1) minus 1
   LD C,A
-  LD A,(DE)
+  LDH A,($17)
   CP C      ;Carry clear if pixel gets drawn here
   CCF
 ;Clears carry if stacatto says so.
@@ -845,38 +825,51 @@ SongLoop:
   JR ---
 
 +++++
-  POP DE
-  POP HL
 ++
-  INC L
-  LD A,(DE)     ;Old Wave
+  LD HL,$C223   ;Old wave
+  LDH A,($16)   ;Curr Wave
   CP (HL)
   JR z,+
 ;New wave
+  LD (HL),A
   LD BC,$C00A
-  LD A,(HL)
-  LD (DE),A
-  AND $03
-  RLCA
+  AND $C0
+  SWAP A
+  RRCA
   ADD $64
   LD (BC),A
   INC C
   INC A
   LD (BC),A
 +
-  INC E
   INC L
-  LD A,(DE)     ;Old note
-  CP (HL)
+  LDH A,($82)   ;New note
+  CP (HL)       ;Old note
   JR z,+
 ;New note
+  LD (HL),A
+  ;Get octave
+  LD A,(channeltwobase+$2C)
+  LD C,A        ;Go to half steps from base
+  ADD A   ;*2
+  ADD C   ;*3
+  ADD A   ;*6
+  ADD A   ;*12
+  LD C,A
   LD A,(HL)
-  LD (DE),A
+  SWAP A
+  AND $0F
+  SUB $04
+  ADD C
+  ;Transform to x pos
   RLCA
-  ADD 7-24
+  ADD 8
   LD ($C105),A
   LD BC,NoteLUT
   LD A,(HL)
+  SWAP A
+  AND $0F
+  SUB $04
 -
   SUB 12
   JR nc,-
@@ -893,12 +886,12 @@ SongLoop:
   INC E
   INC L
 ;Channel 3
-  LD A,(DE)     ;Old Envelope
-  CP (HL)   ;Env changed
+  LD HL,$C230
+  LDH A,($C)     ;Curr Envelope
+  CP (HL)   ;Env changed?
   JR z,++
 ;New envelope
-  LD A,(HL)
-  LD (DE),A
+  LD (HL),A
   LD BC,$C00C
   LD A,$74  ;Zero catch
   LD (BC),A
@@ -906,38 +899,23 @@ SongLoop:
   LD (BC),A
   DEC C
   LD A,(HL)
-  LD (DE),A
-  AND $E0
+  AND $60
   JR z,++
-  LD A,$6C
+  LD A,$6C      ;Always at least 25%
   LD (BC),A
-  LD A,(HL)
-  AND $E0
-  LD B,A
-  XOR A
-  SUB B
-  CP %00100000  ;Edge case: E/F
-  JR nz,+
-  RLA
-+
-  RLCA
-  RLCA
-  AND $03
+  LD A,(HL)     ;75% or 100%?
+  AND %01100000
+  SWAP A
+  RRCA
   ADD $74
   LD ($C00D),A
 ++
-  INC E ;Skip stacatto
-  INC E
   INC L
-  INC L
-  LD A,(DE)     ;Wave
+  LDH A,($85)     ;Current Wave
   CP (HL)
   JR z,+
 ;New wave
-  LD A,(HL)
-  LD (DE),A
-  PUSH HL
-  PUSH DE
+  LD (HL),A
   LD DE,Wave    ;Go to this wave
   SWAP A
   LD H,A
@@ -1016,22 +994,32 @@ SongLoop:
   
   POP DE
   POP DE
-  POP DE
-  POP HL
 +
-  INC E
-  INC L
-  LD A,(DE)     ;Old note
+  LD HL,$C232
+  LDH A,($83)     ;Current note
   CP (HL)
   JR z,+
 ;New note
+  LD (HL),A
+  LD A,(channelthreebase+$2C)
+  LD C,A        ;Go to half steps from base
+  ADD A   ;*2
+  ADD C   ;*3
+  ADD A   ;*6
+  ADD A   ;*12
+  LD C,A
   LD A,(HL)
-  LD (DE),A
+  SWAP A
+  AND $0F
+  SUB $04
   RLCA
   ADD 7
   LD ($C109),A
   LD BC,NoteLUT
   LD A,(HL)
+  SWAP A
+  AND $0F
+  SUB $04
 -
   SUB 12
   JR nc,-
@@ -1045,41 +1033,32 @@ SongLoop:
   AND $80
   LD ($C10B),A
 +
-  INC E
-  INC L
 ;Channel 4
-  LD A,(DE)     ;Old Envelope
-  LD B,A
-  INC E
-  LD A,(DE)     ;Old Stacatto
-  INC E
-  LD C,A
-  LD A,B
-  CP (HL)   ;Env changed
-  JR nz,+
-  INC L
-  LD A,C
-  CP (HL)   ;Stacatto changed
-  JR z,++
-+
-  INC L ;Alignment
-;New envelope/stacatto
-++
-  INC E
-  INC E
-  INC L
-  INC L
-  LD A,(DE)     ;Old note
+  LD HL,$C240
+  LDH A,($84)     ;Curr note
   CP (HL)
   JR z,+
 ;New note
+  LD (HL),A
+  LD A,(channelfourbase+$2C)
+  LD C,A        ;Go to half steps from base
+  ADD A   ;*2
+  ADD C   ;*3
+  ADD A   ;*6
+  ADD A   ;*12
+  LD C,A
   LD A,(HL)
-  LD (DE),A
+  SWAP A
+  AND $0F
+  SUB $04
   RLCA
   ADD 8
   LD ($C10D),A
   LD BC,NoteLUT
   LD A,(HL)
+  SWAP A
+  AND $0F
+  SUB $04
   ADD 8 ;Adjustment
 -
   SUB 12
@@ -1106,7 +1085,8 @@ RoutLUT:
 RinLUT:
  .db $60,$62,$64,$66,$68,$6A,$6C,$6E
 NoteLUT:
- .db $71,$70,$71,$70,$70,$71,$70,$71,$70,$71,$70,$70
+;     A   A+  B   C   C+  D   D+  E   F   F+  G   G+
+ .db $70,$71,$70,$70,$71,$70,$71,$70,$70,$71,$70,$71
 .ENDS
 
 .SECTION "vBlank" FREE
@@ -1192,9 +1172,9 @@ vBlank:
   LD A,(BC)
   RRCA
   LDH ($26),A
-  JR nc,SoundSkip
+  JP nc,SoundSkip
   RRA   ;Bit 1
-  JR nc,MusicSkip
+  JP nc,MusicSkip
   RRA   ;Sound effects
   RRA   ;New song
   JR nc,+
@@ -1207,8 +1187,6 @@ vBlank:
   LD H,A
   LD D,H
   LD E,L
-  DEC DE
-  DEC DE
   LD C,<channelfourbase+$28
   LD A,$08
 -   ;Copy over channel pointers
@@ -1222,8 +1200,6 @@ vBlank:
   LD H,(HL)
   LD L,A
   ADD HL,DE
-  INC HL
-  INC HL
   LD A,L
   LD (BC),A
   INC C
@@ -1253,10 +1229,28 @@ vBlank:
   DEC A
   DEC A
   JR nz,-
+  LD HL,channelcontrolbase+$28
+  LD A,(DE)     ;channel data pointer
+  ADD E
+  INC DE
+  LDI (HL),A
+  LD A,(DE)
+  DEC DE
+  ADC D
+  LD (HL),A
+  LD L,<channelcontrolbase+$2D
+  XOR A
+  LDI (HL),A    ;Remaining note length
+  LD (HL),1     ;Tempo quotient
+  INC L
+  LDI (HL),A    ;Tempo remainder
+  LDI (HL),A    ;Tempo counter
   LD HL,musicglobalbase+1
   RES 3,(HL)
   POP AF    ;Control register.
 +   ;New song finished
+  LD C,<channelcontrolbase+$28
+;  CALL MusicReadCommand
   RRA
   JR nc,+
   LD C,<channelfourbase+$28
@@ -1267,16 +1261,28 @@ vBlank:
   LDH ($1A),A
   LD C,<channelthreebase+$28
   CALL MusicReadCommand
+  PUSH AF       ;Push to display
+  LDH A,($86)   ;Push to display
+  LDH ($83),A   ;Push to display
+  POP AF        ;Push to display
 +   ;Channel 3 finished
   RRA
   JR nc,+
   LD C,<channeltwobase+$28
   CALL MusicReadCommand
+  PUSH AF       ;Push to display
+  LDH A,($86)   ;Push to display
+  LDH ($82),A   ;Push to display
+  POP AF        ;Push to display
 +   ;Channel 2 finished
   RRA
   JR nc,+
   LD C,<channelonebase+$28
   CALL MusicReadCommand
+  PUSH AF       ;Push to display
+  LDH A,($86)   ;Push to display
+  LDH ($81),A   ;Push to display
+  POP AF        ;Push to display
 +   ;Channel 1 finished
 MusicSkip:
 ;Sound effects go here

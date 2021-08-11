@@ -1,5 +1,6 @@
 DEMOSONG=Test
 CC=cc
+MML=MML6\bin\MML6.exe
 
 vpath %.asm .\musPlayer
 vpath %.mml .\Songs
@@ -17,14 +18,14 @@ $(LINK) : Makefile | $(OBJDIR)
 	$(file > $(LINK),[objects])
 	$(foreach I, $(OBJ),$(file >> $(LINK), $(I)))
 
-$(OBJDIR)\\%.obj : %.asm | $(OBJDIR)
+$(OBJ) : musPlayer.asm Sound.asm Voicelist.asm playerSongs.asm $(SONGTARGET) | $(OBJDIR)
 	wla-gb -v -I $(OBJDIR) -I musPlayer -o $@ $<
 
-$(SONGTARGET) : $(addsuffix .mml,$(DEMOSONG)) MML6\MML6 | $(OBJDIR)
-	MML6\MML6 -i=$< -o=$@ -t=gb
+$(SONGTARGET) : $(addsuffix .mml,$(DEMOSONG)) $(MML) | $(OBJDIR)
+	$(MML) -i=$< -o=$@ -t=gb
 
-MML6\MML6 :
-	cd MML6 && make CC=$(CC)
+$(MML) :
+	cd MML6 && $(MAKE) CC=$(CC)
 
 $(OBJDIR) :
 	mkdir $@
@@ -32,3 +33,4 @@ $(OBJDIR) :
 clean :
 	rmdir /S /Q obj
 	del /S /Q musPlayer.gb musPlayer.sym
+	cd MML6 && $(MAKE) clean

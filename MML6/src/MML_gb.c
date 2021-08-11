@@ -145,7 +145,7 @@ bool isOne(bool* X, int len)
 
 #define inRange(X, Y, Z) (Y <= Z && Y >= X)
 
-#define CHCNT 4
+#define CHCNT 4         //Does not include control channel 0
 #define LENCNT 16
 #define LOOPCNT 7
 struct gb_entryData {
@@ -509,13 +509,14 @@ struct gb_entryData** check(MMLStruct* curr) {
                 thisEnt->supp = curr->primaryVal;
                 break;
             default:    //Handle unknown directives gracefully
+                warn(curr->line, curr->column, "unknown directive");
                 thisEnt = thisEnt->prev;
                 rem(thisEnt->next);
                 break;
         }
     }
     for (int i = 0; i <= CHCNT; i++) {
-        if (HEAD[i]->next) {
+        if (HEAD[i] && HEAD[i]->next) {
             HEAD[i] = HEAD[i]->next;
             rem(HEAD[i]->prev);
         } else {
@@ -688,9 +689,9 @@ struct gb_entryData* loopMap(struct gb_entryData* curr) {
 
 int printMML(struct gb_entryData** channels, FILE* outfile) {
     //Constant header size
-    int offset = 8;
+    int offset = (CHCNT+1) * 2;
     //Count bytes in each channel
-    for (int ch = 1; ch < CHCNT; ch++) {
+    for (int ch = 0; ch < CHCNT; ch++) {
         fwrite(&offset, 2, 1, outfile); //Channel start
         for (struct gb_entryData* curr = channels[ch]; curr; curr = curr->next) {
             //Nondirectives don't get written
@@ -706,7 +707,7 @@ int printMML(struct gb_entryData** channels, FILE* outfile) {
     fwrite(&offset, 2, 1, outfile); //Channel 4 start
     //Header printed
     //Print each channel's contents
-    for (int ch = 1; ch < CHCNT+1; ch++) {
+    for (int ch = 0; ch < CHCNT+1; ch++) {
         for (struct gb_entryData* curr = channels[ch]; curr; curr = curr->next) {
             //Do not write labels
             if (!curr->entry && !curr->bytedata && curr->supp != -1)
@@ -717,25 +718,6 @@ int printMML(struct gb_entryData** channels, FILE* outfile) {
     }
     return offset;
 }
-
-#if 0
-//Converts from loops and labels to loops and offsets
-int labelConv(struct gb_entryData* curr) {
-    //We're using a static buffer to make this easier
-    struct jump {
-        struct gb_entryData* loopset;
-        int byteSpan;
-    } loops[127];
-    for (; curr; curr = curr->next) {
-        if (inRange(0x08, curr->entry, 0x0F) && curr->bytedata < 0x80) {
-            //Loop start
-        } else if (!curr->entry && !curr->bytedata && curr->supp > -1) {
-            //Label
-        };
-    }
-    return 0;
-}
-#endif
 
 struct jump {
     struct jump* prev;
@@ -857,19 +839,8 @@ int lenOffsetAdj(struct gb_entryData* curr) {
         //If any given entry meets the requirements, all previous meet as well, and
         //a springboard is needed
         //If the next directive is two bytes, the threshhold lowers
-        /*for (struct jump* thisJmp = jmpList; thisJmp; thisJmp = thisJmp->next) {
-            if (thisJmp->byteSpan == 125) {
-                //This jump needs a springboard
-                struct gb_entryData spring = {
-                    .supp = -1,
-                    .entry = 0x0F,
-                    .bytedata = 0x08
-                };
-                insertDirective(curr, &spring);
-            }
-        }*/
+        
         //Sort the jump list
-        //Decide: Big to little, or little to big
         //Little to big
         int count1 = 0, count2 = 0;
         for (struct jump* j = jmpList; j; j = j->next)
@@ -957,7 +928,7 @@ int writeMML_gb(MMLStruct* curr, FILE* outfile) {
         return -1;
     };
     //Assign loop indicies and length indicies
-    for (int ch = 1; ch <= CHCNT; ch++) {
+    for (int ch = 0; ch <= CHCNT; ch++) {
         HEAD[ch] = loopMap(HEAD[ch]);
         HEAD[ch] = lengthMap(HEAD[ch]);
         //Adjust loop offsets to count actual bytes
@@ -967,46 +938,3 @@ int writeMML_gb(MMLStruct* curr, FILE* outfile) {
     printMML(HEAD, outfile);
     return 0;
 }
-
-
-//Loop once
-    //Collect lengths as usual; paste as needed
-    //Collect loops as usual; copy over current length state
-        //Involves updating available indicies
-    //At loop end, remove identical indicies
-    //For each changed length:
-        //Seek through until that index is overwritten
-            //If that length appears, insert a directive and stop
-//  while (dir not length) and (length not this)
-//      ...
-//      if (this our length)
-//          assign
-//          break/continue
-//      ...
-//Go through loop tree
-    //Assigning indicies
-        //Top down: pick one.
-
-
-//Old idea:
-
-//Length mapping:
-    //For each new note length:
-        //Add to last node's responsibility list
-//Setting:
-    //For each new node
-        //Put node in active list
-        //Copy responsibility list to node's overwrite list
-        //Copy lengths already present to node's assumption list
-        //Remove lengths in the assumption list from the overwrite list
-    //For each new length:
-        //If there is an empty entry, populate it
-        //else
-            //Seek through the stream, creating a priority list of next usings
-                //from the current length list
-            //If there is a length in the current length list not in the priority list,
-                //overwrite it, preferring a lower assumption list entry count
-            //else
-                //Overwrite the last length in the priority list
-            //For each node, remove the overwritten length from the assumption list (if applicable)
-

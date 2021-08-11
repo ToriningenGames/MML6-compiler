@@ -2,16 +2,18 @@
 ;Back to basics
 ;Modified for music player.
 
-.define channelonebase   $CE04
-.define channeltwobase   $CE44
-.define channelthreebase $CE84
-.define channelfourbase  $CEC4
-.define channelsize $40
+.define channelonebase          $CE04
+.define channeltwobase          $CE36
+.define channelthreebase        $CE68
+.define channelfourbase         $CE9A
+.define channelcontrolbase      $CECC
+.define channelsize $32
 .define musicglobalbase $CE00
 .export channelonebase
 .export channeltwobase
 .export channelthreebase
 .export channelfourbase
+.export channelcontrolbase
 .export musicglobalbase
 .export channelsize
 
@@ -52,7 +54,7 @@
 
 ;Setup:
     ;To use in your project, take a gander at line 1190 - 1284 in musplayer
-    ;Copy-paste this to the end of your vBlank routine, and that should do it.
+    ;Copy-paste that to the end of your vBlank routine, and that should do it.
     ;Also, include this file.
 
 ;This player uses one page of data (256 bytes).
@@ -61,8 +63,8 @@
 
 ;!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 ;Finally, this player was modified to allow for musplayer to work.
-;To remove these modifications, delete every section headed "Push to display"
-;Otherwise, it spits out what it's reading to the $C200 page.
+;To remove these modifications, delete all instructions marked "Push to display"
+;Otherwise, it spits out notes and Channel 3 waveforms to HRAM
 ;!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
 
@@ -70,34 +72,44 @@
 MemorytoIO:
 ;Converts the register C from pointing to Remaining Note Length
 ;to an IO pointer for the same channel
-  SWAP C
+  PUSH BC
+  LD A,(musicglobalbase)        ;Sound effect check
+  LD B,A
   LD A,C
-  RRA
-  RRA
-  OR $FC
-  AND C
-  LD C,A
+  LD C,$10      ;Start of channel 1
+-
+  SUB channelsize
+  JR c,+
+  INC C         ;Space between IO channels is 5
+  INC C
+  INC C
+  INC C
+  INC C
+  RL B
+  JR -
++
 ;Point to alternate location if sound effect is playing for this channel
-  LD A,(musicglobalbase)
-  BIT 1,C
+  BIT 7,B
   JR z,+
-  RLA
-  RLA
+  SET 7,C       ;Set high bit for RAM echo location
 +
-  BIT 0,C
-  JR z,+
-  RLA
-+
-  SLA C ;Set high bit if sound effects are playing
-  RLA
-  RR C
+  LD A,C
+  POP BC
+  LD C,A
   RET
 IOtoMemory:
+;Converts the register C from pointing to an IO pointer
+;to Remaining Note Length for the same channel
 ;Undoes the effect of MemorytoIO
-  RES 7,C
-  LD A,C
-  OR $03
-  SWAP A
+  LD A,$7F
+  AND C
+  SUB $10
+  LD C,A
+  ADD A         ;Multiply by $32 (channelsize / 5)
+  ADD A
+  ADD C
+  ADD A
+  ADD $2D+<channelonebase     ;to Remaining note length
   LD C,A
   RET
 MusicLoad:
@@ -109,6 +121,12 @@ MusicLoad:
   DEC L
   SET 3,(HL)    ;Indicate new song
   RET
+
+;Read global control register commands
+MusicReadControl:
+  POP AF
+  RET
+
 MusicReadCommand:
   PUSH AF
 ;BC -> Channel play pointer
@@ -156,7 +174,12 @@ MusicReadCommand:
     ;If the result is <= 0, we read directives
   JR z,CommandReadLoop
   JP nc,NewDirectiveSkip    ;If note didn't end, don't play another
+  ;Fall through
 CommandReadLoop:
+;Check for control register
+  LD A,<channelcontrolbase+$2D
+  CP C
+  JR z,MusicReadControl         ;Entry of MusicReadControl
 ;Push the following commands to display:
     ;Envelope
     ;Stacatto
@@ -181,9 +204,8 @@ CommandReadLoop:
   PUSH BC
   LD A,D
   AND $0F
-  ADD ($2D - $27 - 1)
-  CPL
   ADD C
+  SUB ($2D - $18)       ;Adjust base to length table
   LD C,A
   LD A,E
   LD (BC),A
@@ -194,16 +216,16 @@ CommandReadLoop:
   JR z,++
     ;Loop
 ;BC -> remaining note length
-  LD A,$C0  ;Go to base of channel
-  AND C
-  ADD <channelonebase
+  LD A,C
+  SUB $2D  ;Go to base of channel
   LD C,A
   LD A,$07  ;Multiply index by 3
   AND D
   LD D,A
   ADD A
   ADD D
-  ADD C
+  LD D,A
+  ADD C         ;Go to this index
   LD C,A
 ;BC -> this loop
   INC C
@@ -217,9 +239,9 @@ CommandReadLoop:
   LD (BC),A
   JR nz,_loopgo
 ;No loop this time; read next directive
-  LD A,$C0
-  AND C
-  ADD <channelonebase + $2D
+  LD A,C        ;Go back to remaining note length
+  SUB D
+  ADD $2D-2
   LD C,A
   JR -
 _loopsetgo:
@@ -235,9 +257,9 @@ _loopgo:
   LD A,(BC)
   LD L,A
 ;Looping finished; read next directive
-  LD A,$C0
-  AND C
-  ADD <channelonebase + $2D
+  LD A,C
+  SUB D
+  ADD $2D
   LD C,A
   JR -
 _loopset:
@@ -256,9 +278,9 @@ _loopset:
   LD (BC),A
   POP HL    ;We need the current song pointer
 ;Looping finished; read next directive
-  LD A,$C0
-  AND C
-  ADD <channelonebase + $2D
+  LD A,C
+  SUB D
+  ADD $2D
   LD C,A
   JR -
 ++
@@ -269,17 +291,6 @@ _loopset:
   BIT 2,D
   JR z,++
     ;Tone
-;Push to display
-  PUSH BC
-  LD B,$C2
-  LD A,$F0
-  AND C
-  SWAP A
-  DEC A
-  LD C,A
-  LD A,D
-  LD (BC),A
-  POP BC
 ;BC -> remaining note length
   INC C     ;Get Stacatto
   INC C
@@ -306,19 +317,6 @@ _loopset:
   DEC D
   JR nz,++
     ;Envelope
-;Push to display
-  PUSH BC
-  LD B,$C2
-  LD A,$F0
-  AND C
-  SWAP A
-  DEC A
-  DEC A
-  DEC A
-  LD C,A
-  LD A,E
-  LD (BC),A
-  POP BC
 ;BC -> remaining note length
 ;Convert C from memory pointer to IO pointer
   CALL MemorytoIO
@@ -336,18 +334,6 @@ _loopset:
   DEC D
   JR nz,++
     ;Stacatto
-;Push to display
-  PUSH BC
-  LD B,$C2
-  LD A,$F0
-  AND C
-  SWAP A
-  DEC A
-  DEC A
-  LD C,A
-  LD A,E
-  LD (BC),A
-  POP BC
 ;BC -> remaining note length
   LD A,$3F  ;Don't affect wave
   AND E
@@ -438,16 +424,6 @@ _tempo:
   JP -
 ;For these, check the remaining note length and add it in - it could be negative
 +++ ;Rest
-;Push to display
-  PUSH BC
-  LD B,$C2
-  LD A,$F0
-  AND C
-  SWAP A
-  LD C,A
-  LD A,-16
-  LD (BC),A
-  POP BC
 ;BC -> remaining note length
 ;Stamp 0 into envelope register temporarily, then skip pitch lookup and note playing
   SET 5,B   ;Use Tempo continuation to skip note start
@@ -484,20 +460,21 @@ _tempo:
   PUSH HL
 ;HL now free
   LD A,D    ;Directive
+  LDH ($86),A   ;Push to display
 ;Get length
-  AND $0F   ;-(Length Index + 1)
-  CPL
+  AND $0F
   ADD C
+  SUB $28-$18
   LD C,A
   LD A,(BC) ;This note's length
+  LD H,A
 ;Get out of the length fields
-  PUSH AF
-  LD A,C
-  AND $C0   ;Channel filter
-  OR <channelonebase+$2D
+  LD A,D
+  AND $0F
+  CPL
+  ADD C
+  ADD $2D-$18+1 ;Get to remaining note, given we're at first length
   LD C,A
-  POP HL    ;Note Length
-
 ;Set length here
 ;Add Note length to remaining note length
   LD A,(BC)
@@ -562,23 +539,6 @@ _tempo:
   ADD E
   LD E,A
 ;BC -> Note table pointer
-;Push to display
-  LD A,(BC)
-  SUB E
-  CPL
-  INC A
-  RRA
-  PUSH BC
-  PUSH AF
-  LD B,$C2
-  LD A,$F0
-  AND C
-  SWAP A
-  INC A
-  LD C,A
-  POP AF
-  LD (BC),A
-  POP BC
 ;DE -> Note pitch
 ;Do we need to activate stacatto?
   LD A,7
@@ -631,12 +591,9 @@ ChannelThreeSpecial:
   BIT 2,D
   JR z,++
     ;Tone
-;Push to display
-  PUSH HL
-  LD HL,$C20A
-  LD (HL),E
-  POP HL
 ;We can ignore D and use E as an index into the wave table
+  LD A,E        ;Push to display
+  LDH ($85),A   ;Push to display
   CALL MemorytoIO
   PUSH HL
   LD HL,Wave
@@ -659,7 +616,7 @@ ChannelThreeSpecial:
   BIT 6,C
   JR z,--
   LD C,<channelthreebase+$2D
-  LD A,C    ;Turn the channel back on again
+  LD A,$80 ;Turn the channel back on again
   LDH ($1A),A
   POP HL
   JP -
@@ -667,11 +624,6 @@ ChannelThreeSpecial:
   DEC D
   JR nz,++
     ;Envelope
-;Push to display
-  PUSH HL
-  LD HL,$C208
-  LD (HL),E
-  POP HL
 ;Take the high two bits of the volume component
 ;And convert them such that
 ;00 -> 00; 01 -> 11; 10 -> 10; 11 -> 01;
@@ -702,18 +654,6 @@ ChannelThreeSpecial:
   DEC D
   JR nz,++
     ;Stacatto
-;Push to display
-  PUSH BC
-  LD B,$C2
-  LD A,$F0
-  AND C
-  SWAP A
-  DEC A
-  DEC A
-  LD C,A
-  LD A,E
-  LD (BC),A
-  POP BC
   LD A,E    ;DO affect wave
   CALL MemorytoIO
   INC C
@@ -744,16 +684,6 @@ ChannelFourSpecial:
   JP -
 ;For these, check the remaining note length and add it in - it could be negative
 +++ ;Rest
-;Push to display
-  PUSH BC
-  LD B,$C2
-  LD A,$F0
-  AND C
-  SWAP A
-  LD C,A
-  LD A,-16
-  LD (BC),A
-  POP BC
 ;BC -> remaining note length
 ;Stamp 0 into envelope register temporarily, then skip pitch lookup and note playing
   SET 5,B   ;Use Tempo continuation to skip note start
@@ -767,7 +697,7 @@ ChannelFourSpecial:
   LD C,<channelfourbase+$2D ;Go back to remaining note length
 +   ;Note
 ;At this point, we probably won't read another directive
-;Update note pointer
+;Update play pointer
   DEC C
   DEC C
   DEC C
@@ -780,10 +710,10 @@ ChannelFourSpecial:
   PUSH HL
 ;HL now free
   LD A,D    ;Directive
+  LDH ($84),A   ;Push to display
 ;Get length
-  AND $0F   ;-(Length Index + 1)
-  CPL
-  ADD C
+  AND $0F
+  ADD <channelfourbase+$18
   LD C,A
   LD A,(BC) ;This note's length
 ;Get out of the length fields
@@ -858,16 +788,6 @@ ChannelFourSpecial:
   ADC D
   LD D,A
 ;BC -> Remaining Note Length
-;Push to display
-  PUSH BC
-  LD B,$C2
-  LD A,$F0
-  AND C
-  SWAP A
-  LD C,A
-  LD A,L
-  LD (BC),A
-  POP BC
 ;DE -> Note pitch
 ;Do we need to activate stacatto?
 ;For channel 4, this is held in the note table (DE)
