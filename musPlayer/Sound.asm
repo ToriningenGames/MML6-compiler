@@ -267,8 +267,10 @@ _loopset:
   LD (BC),A
   DEC C
   PUSH HL
-  LD D,A
+  LD A,D
+  LD D,0
   ADD HL,DE     ;Include offset
+  LD D,A
   DEC HL    ;Base is the loop itself
   DEC HL
   LD A,H

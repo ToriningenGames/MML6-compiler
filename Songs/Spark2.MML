@@ -37,6 +37,10 @@
 #t1 = -(t2-64)
 
 
+X0 #Control channel
+T120
+[0 :0 R1 ]0
+
 X1 #bass line but sometimes supermelody due to the sweep
 @80
 [0 :0 ^16 S0 O3 H0 @1

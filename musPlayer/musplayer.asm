@@ -579,6 +579,7 @@ SongLoop:
   LD (HL),A
   ;Get octave
   LD A,(channelonebase+$2C)
+  DEC A
   LD C,A        ;Go to half steps from base
   ADD A   ;*2
   ADD C   ;*3
@@ -850,6 +851,7 @@ SongLoop:
   LD (HL),A
   ;Get octave
   LD A,(channeltwobase+$2C)
+  DEC A
   LD C,A        ;Go to half steps from base
   ADD A   ;*2
   ADD C   ;*3
@@ -887,7 +889,7 @@ SongLoop:
   INC L
 ;Channel 3
   LD HL,$C230
-  LDH A,($C)     ;Curr Envelope
+  LDH A,($1C)     ;Curr Envelope
   CP (HL)   ;Env changed?
   JR z,++
 ;New envelope
@@ -1012,8 +1014,9 @@ SongLoop:
   SWAP A
   AND $0F
   SUB $04
+  ADD C
   RLCA
-  ADD 7
+  ADD 8
   LD ($C109),A
   LD BC,NoteLUT
   LD A,(HL)
@@ -1051,6 +1054,7 @@ SongLoop:
   SWAP A
   AND $0F
   SUB $04
+  ADD C
   RLCA
   ADD 8
   LD ($C10D),A
@@ -1059,7 +1063,6 @@ SongLoop:
   SWAP A
   AND $0F
   SUB $04
-  ADD 8 ;Adjustment
 -
   SUB 12
   JR nc,-
