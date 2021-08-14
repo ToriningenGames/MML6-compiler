@@ -38,7 +38,7 @@ BANKS 2
   RET
 .ORG $30
 ;RST $30
-  RET
+  JP HL
 .ORG $38
 ;RST $38
   DI

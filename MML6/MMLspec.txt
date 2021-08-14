@@ -17,8 +17,8 @@
  *      Loops
  *      Sweep
  *      Envelope
- *      Panning?
- *      End of song?
+ *      Panning
+ *      Global volume
  * 
  * Calculating pitch based on a general octave sounds like precision hell, so
  * Look up table! Octave can be multiplied by 12 and shifted by the size of a pitch
@@ -27,8 +27,6 @@
  * 
  * Length: Stored as however many 256ths of a measure a given length is
  *      16 locations to store this in
- * Loops will save the length state and replace it on looping, so it is known
- *     after setting a loop point
  * Optimisation technique:
  *      Decide which note lengths to override based on proximity: go for the note 
  *      length that's furthest away from here
@@ -45,7 +43,7 @@
  *                  xx: Channel 1/2 duty
  *                  Byte data: Channel 3 wave index
  *              0011: Tempo change
- *                  Byte data: magnitude, 0 to append next note
+ *                  Byte data: BPM, 0 to append next note
  *              0010: Auto Length (for stacatto)
  *                  Byte data: value to set Counter to, 0 to disable
  *                      High two bits omitted when not channel 3
@@ -62,23 +60,11 @@
  *          Subspecifier: length
  * 
  * Header format:
- * Header specifies the tables used during playback
- * ? For all channels:
- * ? 2 bytes -> Note tone table
- * ? For each channel:
- * ? 2 bytes -> Note pitch table
- * Those could be separate from the realtime reader (aka preloaded)
- * For each channed:
- * 2 bytes =  Channel start offset
+ * For each channel:
+ * 2 bytes =  Channel start offset from beginning of file
  */
-/*
-    read in the source file
-        convert the text into tokens
-    Tokens get stored in a linked list, with metadata
-    From high priority to low priority, work with every directive
-    When done, output to file.
 
-*/
+
 /*
 MML text format:
 All entries are a character with a number following. Valid characters are:

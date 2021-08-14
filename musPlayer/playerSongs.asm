@@ -7,7 +7,7 @@ Song:
  .incbin "Song.mcs"
 .ENDS
 
-.SECTION "notepitches" ALIGN $100 FREE
+.SECTION "notepitches" FREE
 ;Channel pitches
 Channel1Pitch:
 Channel2Pitch:
