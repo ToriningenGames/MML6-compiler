@@ -1171,126 +1171,7 @@ vBlank:
   LDI (HL),A
   LD (HL),C
 ;Sound
-  LD BC,musicglobalbase+1
-  LD A,(BC)
-  RRCA
-  LDH ($26),A
-  JP nc,SoundSkip
-  RRA   ;Bit 1
-  JP nc,MusicSkip
-  RRA   ;Sound effects
-  RRA   ;New song
-  JR nc,+
-  PUSH AF
-  INC C     ;Get song pointer
-  LD A,(BC)
-  LD L,A
-  INC C
-  LD A,(BC)
-  LD H,A
-  LD D,H
-  LD E,L
-  LD C,<channelfourbase+$28
-  LD A,$08
--   ;Copy over channel pointers
-  PUSH AF   ;And make every channel assume default values
-  ADD E
-  LD L,A
-  LD A,$00
-  ADC D
-  LD H,A
-  LDI A,(HL)
-  LD H,(HL)
-  LD L,A
-  ADD HL,DE
-  LD A,L
-  LD (BC),A
-  INC C
-  LD A,H
-  LD (BC),A
-  INC C
-  INC C
-  INC C ;Octave (default 4) (but it's stored as 2)
-  LD A,$02
-  LD (BC),A
-  INC C ;Remaining note length
-  XOR A
-  LD (BC),A
-  INC C ;Tempo (default 120)
-  INC A
-  INC A
-  LD (BC),A
-  INC C
-  INC A
-  LD (BC),A
-  INC C
-  LD (BC),A
-  LD A,C
-  SUB channelsize + 8
-  LD C,A
-  POP AF
-  DEC A
-  DEC A
-  JR nz,-
-  LD HL,channelcontrolbase+$28
-  LD A,(DE)     ;channel data pointer
-  ADD E
-  INC DE
-  LDI (HL),A
-  LD A,(DE)
-  DEC DE
-  ADC D
-  LD (HL),A
-  LD L,<channelcontrolbase+$2D
-  XOR A
-  LDI (HL),A    ;Remaining note length
-  LD (HL),1     ;Tempo quotient
-  INC L
-  LDI (HL),A    ;Tempo remainder
-  LDI (HL),A    ;Tempo counter
-  LD HL,musicglobalbase+1
-  RES 3,(HL)
-  POP AF    ;Control register.
-+   ;New song finished
-  LD C,<channelcontrolbase+$28
-;  CALL MusicReadCommand
-  RRA
-  JR nc,+
-  LD C,<channelfourbase+$28
-  CALL MusicReadCommand
-+   ;Channel 4 finished
-  RRCA  ;Channel 3 is handled specially
-  JR nc,+
-  LDH ($1A),A
-  LD C,<channelthreebase+$28
-  CALL MusicReadCommand
-  PUSH AF       ;Push to display
-  LDH A,($86)   ;Push to display
-  LDH ($83),A   ;Push to display
-  POP AF        ;Push to display
-+   ;Channel 3 finished
-  RRA
-  JR nc,+
-  LD C,<channeltwobase+$28
-  CALL MusicReadCommand
-  PUSH AF       ;Push to display
-  LDH A,($86)   ;Push to display
-  LDH ($82),A   ;Push to display
-  POP AF        ;Push to display
-+   ;Channel 2 finished
-  RRA
-  JR nc,+
-  LD C,<channelonebase+$28
-  CALL MusicReadCommand
-  PUSH AF       ;Push to display
-  LDH A,($86)   ;Push to display
-  LDH ($81),A   ;Push to display
-  POP AF        ;Push to display
-+   ;Channel 1 finished
-MusicSkip:
-;Sound effects go here
-;Sound channel will have to disable Channel 3 if neither are using it
-SoundSkip:
+  CALL PlayTick
   POP AF
   POP BC
   POP DE
@@ -1334,7 +1215,7 @@ OAMRoutine:
   RET
 .ENDS
 
-.include "Sound.asm"
+.include "Engine.asm"
 .include "playerSongs.asm"
 
 .SECTION "Tile" FREE

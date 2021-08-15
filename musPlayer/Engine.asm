@@ -1,14 +1,300 @@
-;Main loop
+;Sound player 5.0
 
+.define channelonebase          $CE04
+.define channeltwobase          $CE36
+.define channelthreebase        $CE68
+.define channelfourbase         $CE9A
+.define channelcontrolbase      $CECC
+.define channelsize $32
+.define musicglobalbase $CE00
+.export channelonebase
+.export channeltwobase
+.export channelthreebase
+.export channelfourbase
+.export channelcontrolbase
+.export musicglobalbase
+.export channelsize
+
+
+;See MMLspec.txt for binary format of music data
+;Memory map:
+    ;Global:
+    ;+$00: 1 byte : Sound effect control (don't use)
+        ;%12341234
+        ; ||||++++--- Sound effect requested
+        ; ++++------- Sound effect playing
+    ;+$01: 1 byte : Control register
+        ;%1234NEQS
+        ; |||||||+--- All sound on
+        ; ||||||+---- Music on
+        ; |||||+----- Enable sound effects (keep 0, don't use)
+        ; ||||+------ New song
+        ; ++++------- Channel N on
+    ;+$02: 2 bytes: song pointer
+    ;Contains per channel:
+    ;+$00: 3 bytes: 8 loops + counter
+    ;+$18: 1 byte : 16 lengths
+    ;+$28: 2 bytes: Play pointer
+    ;+$2A: 2 bytes: note table pointer
+    ;+$2C: 1 byte : Octave offset
+    ;+$2D: 1 byte : remaining note length
+    ;+$2E: 1 byte : tempo quotient value
+    ;+$2F: 1 byte : tempo remainder value
+    ;+$30: 1 byte : tempo remainder counter
+    ;+$31: 1 byte : Stacatto value
+
+;Use:
+    ;Call MusicLoad with BC->the song file to prepare the song
+    ;Set the control register (see Memory Map) to play music
+    ;Have interrupts enabled
+;Switching songs:
+    ;Just call MusicLoad again, and have interrupts enabled.
+
+;Setup:
+    ;Include this file in your project
+    ;Call PlayTick at the end of your vBlank routine
+;More detailed setup:
+    ;PlayChannel has to be called with DE==the beginning of channel data for
+    ;each channel about 60 times a second. Varying this will affect the tempo
+    ;of the channels
+
+;This player uses 256 bytes. It relies on this block not crossing a page boundry
+
+.SECTION "Music Engine" FREE
+
+MusicLoad:
+;BC->music file
+  LD HL,musicglobalbase+$03
+  LD (HL),B
+  DEC L
+  LD (HL),C
+  DEC L
+  SET 3,(HL)    ;Indicate new song
+  RET
+
+_InitializeChannel:
+;Set Play Pointer to value pointed to by HL, added to BC
+;Set Octave to 2    (octave 4)
+;Set Tempo Quotient to 2    (Tempo 120)
+;Set Tempo Remainder to 0
+;Set Stacatto to 0  (no length enable)
+;Set Remaining Length to 0
+;Set Remainder Counter to 0
+  PUSH HL
+  PUSH BC
+    LDI A,(HL)
+    LD H,(HL)
+    LD L,A
+    ADD HL,BC
+    LD B,H
+    LD C,L
+    LD HL,$0028   ;Play pointer
+    ADD HL,DE
+    LD (HL),C
+    INC L
+    LD (HL),B
+    INC L
+    INC L
+    INC L       ;Octave offset
+    XOR A
+    LD (HL),2
+    INC L       ;Remaining note length
+    LDI (HL),A
+    LD (HL),2   ;Tempo quotient
+    INC L
+    LDI (HL),A  ;Tempo remainder
+    LDI (HL),A  ;Tempo counter
+    LDI (HL),A  ;Stacatto
+  POP BC
+  POP HL
+  INC HL        ;Point to next entry
+  INC HL
+  RET
+
+;Given this channel, is it time to play another note?
+;Carry set if so
+_ChannelTick:
+  LD HL,$002F
+  ADD HL,DE
+  LDI A,(HL)    ;Accumulate remainder
+  ADD (HL)
+  LDD (HL),A
+  DEC L
+  DEC L
+  LDI A,(HL)    ;Remaining note length
+  SBC (HL)      ;Tick down remaining note length, with carry from fractional
+  DEC L
+  LD (HL),A
+;Carry set right from subtract
+  RET
+
+PlayTick:
+  LD A,(musicglobalbase+$01)
+  RRCA
+  LDH ($26),A   ;Master sound enable bit
+  RET nc
+  BIT 0,A       ;Music enable bit
+  RET nc
+  BIT 2,A       ;New Song
+  JR z,+
+  ;Set new song
+  RES 2,A
+  RLCA
+  LD HL,musicglobalbase+$01     ;Control register
+  LDI (HL),A    ;Move HL to new song pointer
+  LD C,(HL)
+  INC L
+  LD B,(HL)
+  LD H,B
+  LD L,C
+  LD DE,channelcontrolbase
+  CALL _InitializeChannel
+  LD E,<channelonebase
+  CALL _InitializeChannel
+  LD E,<channeltwobase
+  CALL _InitializeChannel
+  LD E,<channelthreebase
+  CALL _InitializeChannel
+  LD E,<channelfourbase
+  CALL _InitializeChannel
++
+  LD DE,channelcontrolbase
+  CALL _ChannelTick
+  CALL c,_PlayChannel
+  LD A,(musicglobalbase+$01)
+  BIT 4,A
+  JR z,+
+  LD E,<channelonebase
+  CALL _ChannelTick
+  CALL c,_PlayChannel
++
+  LD A,(musicglobalbase+$01)
+  BIT 5,A
+  JR z,+
+  LD E,<channeltwobase
+  CALL _ChannelTick
+  CALL c,_PlayChannel
++
+  LD A,(musicglobalbase+$01)
+  BIT 6,A
+  JR z,+
+  LD E,<channelthreebase
+  CALL _ChannelTick
+  CALL c,_PlayChannel
++
+  LD A,(musicglobalbase+$01)
+  BIT 7,A
+  RET z
+  LD E,<channelfourbase
+  CALL _ChannelTick
+  RET nc
+;  JR _PlayChannel      Fall through
+
+;Main per channel loop
+_PlayChannel:
+;DE= Pointer to channel data
+  LD HL,$0028   ;Play pointer
+  ADD HL,DE
+  LDI A,(HL)
+  LD H,(HL)
+  LD L,A
+  LDI A,(HL)
+  LD C,A
+  AND $E0       ;Check for second byte
+  JR nz,+
+  LDI A,(HL)
+  LD B,A
++
+  PUSH BC
+    LD B,H      ;Store new play pointer
+    LD C,L
+    LD HL,$0028
+    ADD HL,DE
+    LD (HL),C
+    INC L
+    LD (HL),B
+  POP BC
+  LD A,C
+  LD C,-1
+  PUSH AF       ;Directive is ready, carry clear from preceding AND
+    LD A,E      ;Calculate addresses for this channel (IO/Function)
+-
+    INC C
+    SUB channelsize
+    JR nc,-
+    LD A,C      ;Multiply by 5 for IO addresses
+    ADD A
+    ADD A
+    ADD C
+    LD C,A
+    ADD A       ;Multiply by another 4 for function table address (total 20)
+    ADD A
+    ADD <_Channel1Directives
+    LD L,A
+    LD A,0
+    ADC >_Channel1Directives
+    LD H,A
+    LD A,C
+    ADD $10     ;IO base
+    LD C,A
+  POP AF
+  PUSH AF       ;Determine which function in table to run
+  PUSH BC
+    LD B,H
+    LD C,L
+    LD HL,_DirectiveBoundTable
+-
+    CP (HL)
+    INC HL
+    JR nc,+
+    ;Not this function
+    INC BC
+    INC BC
+    JR -
++      ;Use this function
+    LD A,(BC)   ;Get function address
+    INC BC
+    LD L,A
+    LD A,(BC)
+    LD H,A
+  POP BC
+  POP AF
 ;AF is top of stack, carry is clear
 ;No more directives read when carry is set on stack
 ;Do not maintain Play pointer when calling
-  PUSH DE
   PUSH AF
     RST $30       ;CALL HL
   POP AF
-  POP DE
-  JR nc,-
+  JR nc,_PlayChannel
+  RET
+
+;Directive list
+;Order is important
+;Lowest values for a given directive
+_DirectiveBoundTable:
+ .db $40,$30,$20,$10,$08,$04,$03,$02,$01,$00
+;Function to call, given a directive
+_Channel1Directives:
+ ;Lowest value  ;Function for directive
+ .dw _Note,      _Rest,      _Octave, _Length
+ .dw _Loop,      _Tone,      _Tempo,  _Stacatto
+ .dw _Envelope,  _Sweep
+_Channel2Directives:
+ .dw _Note,      _Rest,      _Octave, _Length
+ .dw _Loop,      _Tone,      _Tempo,  _Stacatto
+ .dw _Envelope,  _None
+_Channel3Directives:
+ .dw _Note3,     _Rest3,     _Octave, _Length
+ .dw _Loop,      _Tone3,     _Tempo,  _Stacatto3
+ .dw _Envelope3, _None
+_Channel4Directives:
+ .dw _Note4,     _Rest,      _Octave, _Length
+ .dw _Loop,      _None,      _Tempo,  _None
+ .dw _None,      _None
+_Channel0Directives:
+ .dw _Note,      _SetLength, _None,   _Length
+ .dw _Loop,      _None,      _Tempo,  _None
+ .dw _Envelope0, _None
 
 ;Directive actions
 ;Calling convention
@@ -19,22 +305,29 @@
 ;Preserve DE
 
 ;Note
-_Note:
+_Note3:
   PUSH AF       ;Saved for length calculation
   ;Channel 3 needs to be stopped to change its notes.
-  ;Nothing else has anything on IO+$00 bit 7, so it's safe for all channels
     LDH A,(C)
     AND $7F       ;Preserve other bits
     LDH (C),A     ;Turn it off
     OR $80
     LDH (C),A     ;And on again
+  POP AF
+_Note:
+  PUSH AF
     LD HL,$002C   ;Octave offset
     ADD HL,DE
-    LD B,(HL)
     AND $F0     ;Get absolute note
     SUB $40
     SWAP A
-    ADD B
+    LD B,A
+    LD A,(HL)   ;Multiply octave by 12
+    ADD A
+    ADD (HL)
+    ADD A
+    ADD A
+    ADD B       ;Add in note
     ADD A       ;Table entries are 2 bytes
     LD HL,$002A     ;Note table pointer
     ADD HL,DE
@@ -50,8 +343,11 @@ _Note:
     INC C
     INC C
     LDH (C),A   ;Frequency lo
-    LD B,(HL)
+    LD A,$3F    ;Don't have high two bits set, even if the table does
+    AND (HL)
+    LD B,A
     LD HL,$0031 ;Stacatto
+    ADD HL,DE
     LD A,(HL)
     OR A
     LD A,B
@@ -64,7 +360,60 @@ _Note:
     LDH (C),A
   POP AF
 ;Calculate note length
-;  JR _SetLength        ;Fall through
+  JR _SetLength
+
+_Note4:
+  LD HL,$002C   ;Octave Offset
+  ADD HL,DE
+  PUSH AF
+    LD A,(HL)   ;Multiply octave by 12 (%00001100) (octaves -> half steps)
+    LD B,A
+    ADD A
+    ADD B
+    ADD A
+    ADD A
+    LD B,A
+    DEC L       ;Note table pointer
+    LDD A,(HL)
+    LD L,(HL)
+    LD H,A
+  POP AF
+  PUSH BC
+  PUSH AF
+    AND $F0     ;Get note to half steps from table base
+    SUB $40
+    SWAP A
+    ADD B
+    PUSH BC
+    PUSH AF
+      ADD A       ;2 bytes an entry
+      ADD L
+      LD L,A
+      LD A,0
+      ADC H
+      LD H,A
+      INC HL    ;Envelope data
+      LD B,(HL)
+      CALL _Envelope
+      LD HL,$002A       ;Note table pointer
+      ADD HL,DE
+      LDI A,(HL)
+      LD H,(HL)
+      LD L,A
+      LD BC,24*5        ;Skip from pitch to stacatto
+      ADD HL,BC
+    POP AF      ;Half step count
+    POP BC      ;C is the IO register
+    ADD L       ;Go to this note's stacatto
+    LD L,A
+    LD A,0
+    ADC H
+    LD H,A
+    LD B,A
+    CALL _Stacatto
+  POP AF
+  POP BC
+  JR _Note      ;Play the note like normal
 
 ;Update the Remaining Note Length
 _SetLength:
@@ -109,8 +458,31 @@ _Rest3:
 ;Calculate note length
   JR _SetLength
 
+;Tie
+_Tie:
+  LD HL,$0028   ;Play pointer
+  ADD HL,DE
+  INC (HL)      ;Update play pointer to sit past note
+  LDI A,(HL)    ;Retrieve the play pointer
+  LD H,(HL)     ;So we can tie the next note
+  LD L,A
+  DEC HL
+  LD A,(HL)
+  AND $E0       ;Directive may be a length directive (kinda illegal, but useful)
+  LDI A,(HL)
+  JR nz,_SetLength
+  LD B,(HL)     ;Length data
+  CALL _Length
+  LD HL,$0028   ;Play pointer
+  ADD HL,DE
+  INC (HL)      ;Skip this data as well
+  JR _Tie
+
 ;Tempo
 _Tempo:
+  XOR A         ;Tie check
+  OR B
+  JR z,_Tie
   ;Convert from BPM to ticks/frame by multiplying by 4/225 in fixed point 8.16
   ;This corresponds to a constant of $048B, or %0000010010001101
   ;HL has a convenient 16 bit ADD for us
@@ -147,6 +519,10 @@ _Tempo:
   RET
 
 ;Loop
+_Loop:
+  BIT 7,B
+  JR nz,_LoopGo
+;  JR _LoopSet  Fall through
 _LoopSet:
   PUSH AF
     LD HL,$0028   ;Play pointer
@@ -157,6 +533,8 @@ _LoopSet:
     LD A,(HL)
     ADC 0
     LD B,A
+    DEC BC      ;Subtract two to adjust for this directive
+    DEC BC
   POP AF
   AND $07       ;Go to appropriate loop data
   LD L,A        ;Multiply by 3
@@ -182,11 +560,13 @@ _LoopGo:
   LD L,A
   LD H,$00
   ADD HL,DE
-  INC (HL)
   LD A,B
+  OR A
+  JR z,+        ;Always loop when specified count==0
+  INC (HL)
   CP (HL)
   RET c ;If we have looped enough, don't follow the loop
-;If we are here, we have not looped enough. Follow the loop
++       ;If we are here, we have not looped enough. Follow the loop
   DEC L
   LDD A,(HL)
   LD C,(HL)
@@ -198,17 +578,16 @@ _LoopGo:
 
 ;Tone
 _Tone:
-  LD HL,$0031
+  LD HL,$0031   ;Stacatto (stacks with wave data)
   ADD HL,DE
   LD B,$03
-  AND A         ;Isolate tone
+  AND B         ;Isolate tone
   RRCA
   RRCA
   LD B,A
   LD A,$3F
   AND (HL)
   OR B
-  LD (HL),A     ;Merge tone and stacatto
   INC C
   LDH (C),A
   RET
@@ -275,6 +654,11 @@ _Envelope3:
   LDH (C),A
   RET
 
+;Envelope (Channel 0)
+;Envelope have the different function of Master Volume on the control channel
+_Envelope0:
+  RET
+
 ;Envelope
 _Envelope:
   INC C
@@ -286,9 +670,16 @@ _Stacatto:
   LD A,$3F
   AND B
   LD B,A
-  LDH A,(C)     ;Include wave data
+  LD HL,$0031
+  ADD HL,DE
+  LD (HL),B
+  INC C
+  LDH A,(C)     ;Include wave data when writing
+  AND $C0
   OR B
-  LD B,A
+  LDH (C),A
+  RET
+
 ;Stacatto (Channel 3)
 ;All bits are used for sweep data, and there is no wave to consider
 _Stacatto3:
@@ -325,4 +716,7 @@ _SetMem:
 ;General data edit
   ADD HL,DE
   LD (HL),B
+_None:
   RET
+
+.ENDS

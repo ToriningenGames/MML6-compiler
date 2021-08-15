@@ -18,7 +18,7 @@ $(LINK) : Makefile | $(OBJDIR)
 	$(file > $(LINK),[objects])
 	$(foreach I, $(OBJ),$(file >> $(LINK), $(I)))
 
-$(OBJ) : musPlayer.asm Sound.asm Voicelist.asm playerSongs.asm $(SONGTARGET) | $(OBJDIR)
+$(OBJ) : musPlayer.asm Engine.asm Voicelist.asm playerSongs.asm $(SONGTARGET) | $(OBJDIR)
 	wla-gb -v -I $(OBJDIR) -I musPlayer -o $@ $<
 
 $(SONGTARGET) : $(addsuffix .mml,$(DEMOSONG)) $(MML) | $(OBJDIR)
