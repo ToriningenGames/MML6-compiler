@@ -62,6 +62,3 @@ Channel4Stacatto:
     ;F
     ;G
 .ENDS
-
-;Channel 3 voices
- .include "Voicelist.asm"

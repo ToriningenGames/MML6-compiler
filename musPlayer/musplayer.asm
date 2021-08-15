@@ -1215,7 +1215,6 @@ OAMRoutine:
   RET
 .ENDS
 
-.include "Engine.asm"
 .include "playerSongs.asm"
 
 .SECTION "Tile" FREE
