@@ -111,23 +111,6 @@ _InitializeChannel:
   INC HL
   RET
 
-;Given this channel, is it time to play another note?
-;Carry set if so
-_ChannelTick:
-  LD HL,$002F
-  ADD HL,DE
-  LDI A,(HL)    ;Accumulate remainder
-  ADD (HL)
-  LDD (HL),A
-  DEC L
-  DEC L
-  LDI A,(HL)    ;Remaining note length
-  SBC (HL)      ;Tick down remaining note length, with carry from fractional
-  DEC L
-  LD (HL),A
-;Carry set right from subtract
-  RET
-
 PlayTick:
   LD A,(musicglobalbase+$01)
   RRCA
@@ -159,40 +142,49 @@ PlayTick:
   CALL _InitializeChannel
 +
   LD DE,channelcontrolbase
-  CALL _ChannelTick
-  CALL c,_PlayChannel
+  CALL _PlayChannel
   LD A,(musicglobalbase+$01)
   BIT 4,A
   JR z,+
   LD E,<channelonebase
-  CALL _ChannelTick
-  CALL c,_PlayChannel
+  CALL _PlayChannel
 +
   LD A,(musicglobalbase+$01)
   BIT 5,A
   JR z,+
   LD E,<channeltwobase
-  CALL _ChannelTick
-  CALL c,_PlayChannel
+  CALL _PlayChannel
 +
   LD A,(musicglobalbase+$01)
   BIT 6,A
   JR z,+
   LD E,<channelthreebase
-  CALL _ChannelTick
-  CALL c,_PlayChannel
+  CALL _PlayChannel
 +
   LD A,(musicglobalbase+$01)
   BIT 7,A
   RET z
   LD E,<channelfourbase
-  CALL _ChannelTick
-  RET nc
 ;  JR _PlayChannel      Fall through
 
 ;Main per channel loop
 _PlayChannel:
 ;DE= Pointer to channel data
+  LD HL,$002F
+  ADD HL,DE
+  LDI A,(HL)    ;Accumulate remainder
+  ADD (HL)
+  LDD (HL),A
+  DEC L
+  DEC L
+  LDI A,(HL)    ;Remaining note length
+  SBC (HL)      ;Tick down remaining note length, with carry from fractional
+  DEC L
+  LD (HL),A
+;Carry set right from subtract
+  RET nc
+--
+;Do play notes
   LD HL,$0028   ;Play pointer
   ADD HL,DE
   LDI A,(HL)
@@ -265,7 +257,7 @@ _PlayChannel:
   PUSH AF
     RST $30       ;CALL HL
   POP AF
-  JR nc,_PlayChannel
+  JR nc,--
   RET
 
 ;Directive list
@@ -409,7 +401,7 @@ _Note4:
     LD A,0
     ADC H
     LD H,A
-    LD B,A
+    LD B,(HL)
     CALL _Stacatto
   POP AF
   POP BC
@@ -436,6 +428,7 @@ _SetLength:
 
 ;Rest
 _Rest:
+  LD L,A
   INC C
   INC C
   LDH A,(C)     ;Save envelope value
@@ -444,6 +437,7 @@ _Rest:
   LDH (C),A     ;A zeroed envelope ends notes
   LD A,B
   LDH (C),A
+  LD A,L        ;Directive
 ;Calculate note length
   JR _SetLength
 
@@ -598,10 +592,10 @@ _Tone3:
   ;XOR A     ;Directive alreay has high bit unset
   LDH (C),A     ;Turn off channel so we can change wave
   SWAP B
-  LD A,$0F
+  LD A,$F0
   AND B
   LD C,A
-  LD A,$F0
+  LD A,$0F
   AND B
   LD B,A
   LD HL,Wave    ;Wave table
