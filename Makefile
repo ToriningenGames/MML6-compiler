@@ -13,7 +13,7 @@ LIB=$(addprefix $(LIBDIR)/,Sound.lib Voicelist.lib playerSongs.lib)
 LINK=$(OBJDIR)\Link.link
 SONGTARGET=$(OBJDIR)\Song.mcs
 
-demo : $(LINK) $(SONGTARGET) $(OBJ) | $(OBJDIR) $(LIBDIR)
+demo : $(LINK) $(SONGTARGET) $(OBJ) $(LIB) | $(OBJDIR) $(LIBDIR)
 	wlalink -v -S -r $(LINK) musPlayer.gb
 
 $(LINK) : Makefile | $(OBJDIR) $(LIBDIR)
@@ -22,9 +22,10 @@ $(LINK) : Makefile | $(OBJDIR) $(LIBDIR)
 	$(file >> $(LINK),[libraries])
 	$(foreach I, $(LIB),$(file >> $(LINK),BANK 0 SLOT 0 $(I)))
 
-$(OBJ) : musPlayer.asm Sound.asm Voicelist.asm playerSongs.asm $(SONGTARGET) | $(OBJDIR)
+$(OBJ) : musPlayer.asm | $(OBJDIR)
 	wla-gb -v -I $(OBJDIR) -I musPlayer -o $@ $<
 
+$(LIBDIR)/playerSongs.lib : $(SONGTARGET)
 $(LIBDIR)/%.lib : %.asm | $(LIBDIR)
 	wla-gb -v -I $(OBJDIR) -I musPlayer -l $@ $<
 
