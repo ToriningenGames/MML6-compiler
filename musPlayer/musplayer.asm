@@ -588,7 +588,7 @@ SongLoop:
     CP $30
     JR nz,+
     ;This note is a rest
-    LD A,$FA
+    LD A,$FF
 +
     LD B,A
     LD A,(channelonebase+$2C)   ;Octave
@@ -598,6 +598,12 @@ SongLoop:
   JR z,+
 ;New note
   LD (HL),A
+  INC A
+  JR nz,++
+  ;This is a rest
+  LD ($C101),A  ;Place note offscreen
+  JR +
+++
   ;Get octave
   LD A,(channelonebase+$2C)
   DEC A
@@ -612,7 +618,6 @@ SongLoop:
   AND $0F
   SUB $04
 ;"Note" is half steps from table base
-;Or $F9 for a rest (auto-pushes to offscreen)
 ;Position: (N) * 2 + 14
 ;Sprite: LUT + N % 12
   ADD C
@@ -876,7 +881,7 @@ SongLoop:
     CP $30
     JR nz,+
     ;This note is a rest
-    LD A,$FA
+    LD A,$FF
 +
     LD B,A
     LD A,(channeltwobase+$2C)   ;Octave
@@ -886,6 +891,12 @@ SongLoop:
   JR z,+
 ;New note
   LD (HL),A
+  INC A
+  JR nz,++
+  ;This is a rest
+  LD ($C105),A  ;Place note offscreen
+  JR +
+++
   ;Get octave
   LD A,(channeltwobase+$2C)
   DEC A
@@ -950,7 +961,7 @@ SongLoop:
   LD ($C00D),A
 ++
   INC L
-  LDH A,($85)     ;Current Wave
+  LDH A,($A3)     ;Current Wave
   CP (HL)
   JR z,+
 ;New wave
@@ -1044,7 +1055,7 @@ SongLoop:
   CP $30
   JR nz,+
   ;This note is a rest
-  LD A,$FA
+  LD A,$FF
 +
   LD B,A
   LD A,(channelthreebase+$2C)   ;Octave
@@ -1054,6 +1065,12 @@ SongLoop:
   JR z,+
 ;New note
   LD (HL),A
+  INC A
+  JR nz,++
+  ;This is a rest
+  LD ($C109),A  ;Place note offscreen
+  JR +
+++
   LD A,(channelthreebase+$2C)
   LD C,A        ;Go to half steps from base
   ADD A   ;*2
@@ -1098,7 +1115,7 @@ SongLoop:
   CP $30
   JR nz,+
   ;This note is a rest
-  LD A,$FA
+  LD A,$FF
 +
   LD B,A
   LD A,(channelfourbase+$2C)   ;Octave
@@ -1108,6 +1125,12 @@ SongLoop:
   JR z,+
 ;New note
   LD (HL),A
+  INC A
+  JR nz,++
+  ;This is a rest
+  LD ($C10D),A  ;Place note offscreen
+  JR +
+++
   LD A,(channelfourbase+$2C)
   LD C,A        ;Go to half steps from base
   ADD A   ;*2
@@ -1279,8 +1302,6 @@ OAMRoutine:
   JR nz,-
   RET
 .ENDS
-
-.include "playerSongs.asm"
 
 .SECTION "Tile" FREE
 Tiledata:
