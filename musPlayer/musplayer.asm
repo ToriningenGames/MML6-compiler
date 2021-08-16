@@ -33,14 +33,19 @@ BANKS 2
 .ORG $20
 ;RST $20
   RET
-.ORG $28
-;RST $28
-  RET
-.ORG $30
-;RST $30
+.ORG $28    ;CALL (DE)
+  PUSH AF
+  LD A,(DE)
+  INC DE
+  LD L,A
+  LD A,(DE)
+  LD H,A
+  DEC DE
+  POP AF
+  ;Fall through to JP HL
+.ORG $30    ;CALL HL
   JP HL
-.ORG $38
-;RST $38
+.ORG $38    ;HCF
   DI
   HALT
   HALT
@@ -392,15 +397,15 @@ SongLoop:
 +       ;New waveform
   LDH A,($12)   ;New Envelope
   LDI (HL),A
+  LD B,A
   LD A,(channelonebase+$31)     ;New Stacatto
   LD (HL),A
-  LD B,A
   LD HL,$C400
   LD A,$07
   LD C,64
   AND B
   LD E,A
-  LD D,$FF
+  LD D,-1   ;D is directional with envelope data
   BIT 3,B
   JR z,+
   LD D,1
@@ -455,7 +460,7 @@ SongLoop:
   CPL
   AND $0F   ;0-15 -> (16-1) minus 1
   LD C,A
-  LDH A,($12)
+  LD A,(DE)
   CP C      ;Carry clear if pixel gets drawn here
   CCF
 ;Clears carry if stacatto says so.
@@ -570,9 +575,25 @@ SongLoop:
   INC C
   INC A
   LD (BC),A
-+
++   ;Note
   INC L
-  LDH A,($81)   ;New note
+  PUSH HL
+    LD HL,channelonebase+$28    ;Play pointer
+    LDI A,(HL)
+    LD H,(HL)
+    LD L,A
+    DEC HL
+    LD A,(HL)   ;Prior directive was always a note
+    AND $F0 ;Note part only
+    CP $30
+    JR nz,+
+    ;This note is a rest
+    LD A,$FA
++
+    LD B,A
+    LD A,(channelonebase+$2C)   ;Octave
+    OR B    ;Combine octave with note
+  POP HL
   CP (HL)       ;Old note
   JR z,+
 ;New note
@@ -634,9 +655,9 @@ SongLoop:
   ;Write every vertical pixel strips's envelope height, in order
   LDH A,($17)   ;New Envelope
   LDI (HL),A
+  LD B,A
   LD A,(channeltwobase+$31)     ;New Stacatto
   LD (HL),A
-  LD B,A
   LD HL,$C500
   LD A,$07
   LD C,64
@@ -727,7 +748,7 @@ SongLoop:
   CPL
   AND $0F   ;0-15 -> (16-1) minus 1
   LD C,A
-  LDH A,($17)
+  LD A,(DE)
   CP C      ;Carry clear if pixel gets drawn here
   CCF
 ;Clears carry if stacatto says so.
@@ -844,7 +865,23 @@ SongLoop:
   LD (BC),A
 +
   INC L
-  LDH A,($82)   ;New note
+  PUSH HL
+    LD HL,channeltwobase+$28    ;Play pointer
+    LDI A,(HL)
+    LD H,(HL)
+    LD L,A
+    DEC HL
+    LD A,(HL)   ;Prior directive was always a note
+    AND $F0 ;Note part only
+    CP $30
+    JR nz,+
+    ;This note is a rest
+    LD A,$FA
++
+    LD B,A
+    LD A,(channeltwobase+$2C)   ;Octave
+    OR B    ;Combine octave with note
+  POP HL
   CP (HL)       ;Old note
   JR z,+
 ;New note
@@ -997,8 +1034,22 @@ SongLoop:
   POP DE
   POP DE
 +
+  LD HL,channelthreebase+$28    ;Play pointer
+  LDI A,(HL)
+  LD H,(HL)
+  LD L,A
+  DEC HL
+  LD A,(HL)   ;Prior directive was always a note
+  AND $F0 ;Note part only
+  CP $30
+  JR nz,+
+  ;This note is a rest
+  LD A,$FA
++
+  LD B,A
+  LD A,(channelthreebase+$2C)   ;Octave
+  OR B    ;Combine octave with note
   LD HL,$C232
-  LDH A,($83)     ;Current note
   CP (HL)
   JR z,+
 ;New note
@@ -1037,8 +1088,22 @@ SongLoop:
   LD ($C10B),A
 +
 ;Channel 4
+  LD HL,channelfourbase+$28    ;Play pointer
+  LDI A,(HL)
+  LD H,(HL)
+  LD L,A
+  DEC HL
+  LD A,(HL)   ;Prior directive was always a note
+  AND $F0 ;Note part only
+  CP $30
+  JR nz,+
+  ;This note is a rest
+  LD A,$FA
++
+  LD B,A
+  LD A,(channelfourbase+$2C)   ;Octave
+  OR B    ;Combine octave with note
   LD HL,$C240
-  LDH A,($84)     ;Curr note
   CP (HL)
   JR z,+
 ;New note
