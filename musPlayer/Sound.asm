@@ -287,8 +287,8 @@ _Channel4Directives:
  .dw _None,      _None
 _Channel0Directives:
  .dw _Note,      _SetLength, _None,   _Length
- .dw _Loop,      _None,      _Tempo,  _None
- .dw _Envelope0, _None
+ .dw _Loop,      _None,      _Tempo,  _Stacatto3
+ .dw _Envelope0, _SetPanning
 
 ;Directive actions
 ;Calling convention
@@ -620,6 +620,39 @@ _Tone3:
   LDH ($1A),A
   RET
 
+;Set Panning (Channel 0)
+;Given the data, affect a given channel's panning, as so:
+;%000VTSCC
+;    |||++--- Channel to affect
+;    ||+----- L/R select
+;    |+------ 0 to toggle bit, 1 to set/reset bit
+;    +------- Value to set bit to
+_SetPanning:
+  LD C,B    ;Move B to C for a stack trick later
+  LD A,$07
+  AND C ;Channel and side only
+  LD B,A
+  INC B
+  LDH A,($25)
+-
+  RRCA
+  DEC B
+  JR nz,-
+  ;At this point, set carry to the appropriate bit, and rotate left it in
+  BIT 3,C
+  JR z,++
+  ;Set/Reset
+  LD B,A
+  PUSH BC   ;Set carry to the value of the value bit
+  POP AF    ;and A to the register
+  CCF   ;Negate subsequent toggle
+++
+  ;Toggle bit entry
+  CCF
+  RLA
+  LDH ($25),A
+  RET
+
 ;Envelope (Channel 3)
 ;Sets a particular volume level on an inverse scale from the other channels
 _Envelope3:
@@ -656,11 +689,6 @@ _Envelope3:
   LDH (C),A
   RET
 
-;Envelope (Channel 0)
-;Envelope have the different function of Master Volume on the control channel
-_Envelope0:
-  RET
-
 ;Envelope
 _Envelope:
   INC C
@@ -693,6 +721,11 @@ _Stacatto3:
 ;Sweep
 _Sweep:
 ;IO already at the right point
+;  JR _SetIO     ;Fall through
+;Envelope (Channel 0)
+;Envelope have the different function of Master Volume on the control channel
+_Envelope0:
+;  JR _SetIO     ;Fall through
 _SetIO:
   LD A,B
   LDH (C),A

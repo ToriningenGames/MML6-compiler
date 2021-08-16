@@ -43,14 +43,21 @@
  *                  xx: Channel 1/2 duty
  *                  Byte data: Channel 3 wave index
  *              0011: Tempo change
- *                  Byte data: BPM, 0 to append next note
+ *                  Byte data: BPM, 0 to append next note (tie)
  *              0010: Auto Length (for stacatto)
  *                  Byte data: value to set Counter to, 0 to disable
  *                      High two bits omitted when not channel 3
+ *                      If control channel, set global panning
  *              0001: Envelope
  *                  Byte data: Envelope data
+ *                      If control channel, Master volume data
  *              0000: Sweep
  *                  Byte data: Sweep data
+ *                      If control channel, toggle a channel's panning
+ *                          Bits 0-1: Affected channel
+ *                          Bit 2:    L/R select
+ *                          Bit 3:    If 0, output is toggled. Otherwise, bit 4 applies
+ *                          Bit 4:    Value to apply (1==on)
  *      1: Length change
  *          Subspecifier: Length index to change
  *          Byte data: New length value
@@ -71,11 +78,11 @@ All entries are a character with a number following. Valid characters are:
     A-G:    Note declaration
     R:      Rest
     V:      Volume
-    S:      Sweep
+    S:      Sweep/Single Stereo
     T:      Tempo
     O:      Octave
     I:      Instrument
-    H:      Stacatto
+    H:      Stacatto/Global Stereo
     []:     Loop
     X:      Channel
     ^:      Imply
@@ -102,10 +109,16 @@ Meanings:
         Numeral following is the value to feed into the envelope register. If channel 3, the top two bits of volume are taken and fed into channel shifting, with reasonable adjustment.
         A dot following allows specifying volume magnitude and shift separately
         e.g. V15.0 sets volume to maximum with no envelope
+    V: Global Volume setting (Control Channel only)
+        Numeral following is the value to feed into the global volume register.
+        A reminder that the volume only goes up to 7 per side
+        A dot following splits between left and right output
     S: Sweep setting
         Numeral following is the value to feed into the sweep register. If not channel 1, this directive is ignored.
         A dot following allows specifying the time and the magnitude seperate
         e.g. S$77 sets sweep to a slow descent
+    S: Single Panning (Control Channel only)
+        Numeral following is a compound value, specifying one of one voice channel's outputs, and enabling, disabling, or toggling it. 
     T: Tempo setting
         Numeral following is the new tempo, in BPM. Maximum BPM is 255
     O: Set Octave
@@ -114,6 +127,8 @@ Meanings:
         Numeral following is the wave duty to switch to, or a channel 3 wave index. If channel 4, this directive is ignored. A dot with a numeral following specifies a seperate index for channel 3.
     H: Set actual note length (stacatto)
         Numeral following is the value fed into the Sound Length register. When this value is 0, Sound Length disabled
+    H: Set Global Panning (Control Channel only)
+        Numeral following is the value fed into the Channel Output register, specifying which channels go into the left and right outputs
     [: Loop Start
         Numeral following is a label ID to loop back to.
         A dot following allows specifying the particular index to loop with.
@@ -127,8 +142,9 @@ Meanings:
     X: Channel start
         Defines at what directive a given channel should start playing
         Numeral following is which channel is now beginning.
+        Channel 0 is the control channel
     ^: Imply
-        Numeral following is what numeral follows directives that have no numeral after them. This applies to ALL directives (except shifts)!
+        Numeral following is what numeral follows directives that have no numeral after them when mandatory. This applies to ALL directives (except shifts)!
     @: Macro
         Allows substitution of commonly-used phrases of music.
         Numeral following is the macro identifier.
