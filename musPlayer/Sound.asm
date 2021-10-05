@@ -460,6 +460,11 @@ _Tie:
   LD HL,$0028   ;Play pointer
   ADD HL,DE
   INC (HL)      ;Update play pointer to sit past note
+  JR nz,+
+  INC HL
+  INC (HL)
+  DEC HL
++
   LDI A,(HL)    ;Retrieve the play pointer
   LD H,(HL)     ;So we can tie the next note
   LD L,A
@@ -473,6 +478,10 @@ _Tie:
   LD HL,$0028   ;Play pointer
   ADD HL,DE
   INC (HL)      ;Skip this data as well
+  JR nz,_Tie
+  INC HL
+  INC (HL)
+  DEC HL
   JR _Tie
 
 ;Tempo
