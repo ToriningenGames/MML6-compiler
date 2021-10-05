@@ -70,13 +70,19 @@ int main(int argc, char** argv) {
     MMLStruct* musData = readMML(MAINARGS->infile[0]);
     closeInput(MAINARGS);
     musData = processMML(musData);
-    FILE* output = tmpfile();
-    if (!output) {
+    //Microsoft is vile when it comes to C support
+    //We can't use tmpfile, because that requires the program to run as admin!
+    //tmpnam may not be usable as a file on its own; we need to prepend a dot and backslash
+    char temp[L_tmpnam+2] = ".\\";
+    tmpnam(temp+2);
+    FILE* intermediate = fopen(temp, "wb+");
+    if (!intermediate) {
         perror("Error writing output");
         return -1;
     }
-    int resCode = writeMML(musData, output, MAINARGS->target);
-    openOutput(output, MAINARGS);
+    int resCode = writeMML(musData, intermediate, MAINARGS->target);
+    openOutput(intermediate, MAINARGS);
+    fclose(intermediate);
     return resCode;
 }
 
