@@ -28,7 +28,7 @@ Channel4Pitch:
 ;Octaves 2 - 6, following special format
 ;The high-order byte is the associated envelope
  ;      A           B     C           D           E     F           G
- .dw $F173,$4934,$8134,$7101,$3511,$9351,$1E51,$7425,$8A25,$FFFF,$BA23,$F251
+ .dw $F173,$4934,$8134,$7101,$3511,$9351,$1E51,$7425,$8625,$FFFF,$B623,$F251
  .dw $00FF,$00FF,$4921,$00FF,$00FF,$D351,$00FF,$00FF,$00FF,$00FF,$00FF,$00FF
  .dw $00FF,$00FF,$00FF,$00FF,$00FF,$00FF,$00FF,$00FF,$00FF,$00FF,$00FF,$00FF
  .dw $00FF,$00FF,$00FF,$00FF,$00FF,$00FF,$00FF,$00FF,$00FF,$00FF,$00FF,$00FF

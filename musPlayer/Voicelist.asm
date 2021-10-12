@@ -74,4 +74,6 @@ Wave:
 ;23 Rounded Square
 .db $40,$00,$00,$00,$00,$00,$00,$04,$CF,$FF,$FF,$FF,$FF,$FF,$FF,$FC
 
+.db $53,$01,$C8,$B8,$97,$9B,$B3,$EF,$2B,$73,$01,$A3,$4C,$47,$8A,$BC
+
 .ENDS
