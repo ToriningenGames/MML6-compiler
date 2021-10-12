@@ -83,6 +83,7 @@ int main(int argc, char** argv) {
     int resCode = writeMML(musData, intermediate, MAINARGS->target);
     openOutput(intermediate, MAINARGS);
     fclose(intermediate);
+    remove(temp);
     return resCode;
 }
 
