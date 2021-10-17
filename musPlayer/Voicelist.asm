@@ -74,6 +74,25 @@ Wave:
 ;23 Rounded Square
 .db $40,$00,$00,$00,$00,$00,$00,$04,$CF,$FF,$FF,$FF,$FF,$FF,$FF,$FC
 
+;24 Static
 .db $53,$01,$C8,$B8,$97,$9B,$B3,$EF,$2B,$73,$01,$A3,$4C,$47,$8A,$BC
+
+;25 Rough Sine
+.db $02,$13,$25,$58,$89,$AC,$DF,$EF,$FE,$EF,$ED,$BC,$A8,$64,$23,$10
+
+;26 Rounded Off-Duty nonsquare
+.db $40,$11,$01,$11,$01,$10,$4C,$FE,$EF,$EE,$FE,$FE,$FE,$EF,$EE,$FC
+
+;27 Double offset caret (?)
+.db $02,$46,$8A,$CE,$FE,$DC,$BA,$98,$76,$54,$32,$10,$03,$57,$75,$30
+
+;28 Square sign arpeggio?
+.db $00,$40,$07,$5B,$AD,$FC,$FF,$EF,$FD,$FF,$CD,$B9,$00,$70,$04,$01
+
+;29 Test
+.db $02,$34,$45,$55,$46,$8B,$CC,$BA,$98,$88,$AC,$DF,$FD,$CA,$74,$21
+
+;30 Square, triangle, loud saw (75%)
+.db $00,$01,$22,$23,$44,$45,$66,$67,$BA,$BA,$BA,$BA,$BA,$BA,$BA,$BA
 
 .ENDS
