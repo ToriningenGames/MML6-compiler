@@ -8,7 +8,7 @@
 #define STR(X) _STR(X)
 //These are convenient macros for version information
 #define VER_MAJ 6
-#define VER_MIN 1
+#define VER_MIN 3
 #define VER STR(VER_MAJ) "." STR(VER_MIN)
 
 //Add your platform name to the end here

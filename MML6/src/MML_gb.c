@@ -707,7 +707,7 @@ int printMML(struct gb_entryData** channels, FILE* outfile) {
     fwrite(&offset, 2, 1, outfile); //Channel 4 start
     //Header printed
     //Print each channel's contents
-    for (int ch = 0; ch < CHCNT+1; ch++) {
+    for (int ch = 0; ch <= CHCNT; ch++) {
         for (struct gb_entryData* curr = channels[ch]; curr; curr = curr->next) {
             //Do not write labels
             if (!curr->entry && !curr->bytedata && curr->supp != -1)
