@@ -1,17 +1,17 @@
 DEMOSONG=Test
 CC=cc
-MML=MML6\bin\MML6.exe
+MML=MML6/bin/MML6.exe
 
-vpath %.asm .\musPlayer
-vpath %.mml .\Songs
-vpath %.obj .\$(OBJDIR)
+vpath %.asm ./musPlayer
+vpath %.mml ./Songs
+vpath %.obj ./$(OBJDIR)
 
 OBJDIR=obj
 LIBDIR=lib
-OBJ=$(OBJDIR)\musPlayer.obj
+OBJ=$(OBJDIR)/musPlayer.obj
 LIB=$(addprefix $(LIBDIR)/,Sound.lib Voicelist.lib playerSongs.lib)
-LINK=$(OBJDIR)\Link.link
-SONGTARGET=$(OBJDIR)\Song.mcs
+LINK=$(OBJDIR)/Link.link
+SONGTARGET=$(OBJDIR)/Song.mcs
 
 demo : $(LINK) $(SONGTARGET) $(OBJ) $(LIB) | $(OBJDIR) $(LIBDIR)
 	wlalink -v -S -r $(LINK) musPlayer.gb

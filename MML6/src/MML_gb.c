@@ -179,7 +179,7 @@ struct base {
 };
 
 
-struct gb_entryData* HEAD[CHCNT+1];
+static struct gb_entryData* HEAD[CHCNT+1];
 
 struct loopNode* addChild(struct loopNode* parent);
 void assignAllParents(struct loopNode* curr, int index);

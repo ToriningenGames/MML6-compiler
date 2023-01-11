@@ -70,20 +70,28 @@ int main(int argc, char** argv) {
     MMLStruct* musData = readMML(MAINARGS->infile[0]);
     closeInput(MAINARGS);
     musData = processMML(musData);
+    FILE* intermediate = tmpfile();
     //Microsoft is vile when it comes to C support
     //We can't use tmpfile, because that requires the program to run as admin!
     //tmpnam may not be usable as a file on its own; we need to prepend a dot and backslash
-    char temp[L_tmpnam+2] = ".\\";
-    tmpnam(temp+2);
-    FILE* intermediate = fopen(temp, "wb+");
-    if (!intermediate) {
-        perror("Error writing output");
-        return -1;
+    //We can't do this everywhere because it would require intermediate folders on 'nix,
+    //and those aren't created when making a file.
+    char temp[L_tmpnam+2];
+    temp[0] = '\0';
+    if (!intermediate){
+        strncpy(temp, ".\\", 3);
+        tmpnam(temp+2);
+        intermediate = fopen(temp, "wb+");
+        if (!intermediate) {
+            perror("Error writing output");
+            return -1;
+        }
     }
     int resCode = writeMML(musData, intermediate, MAINARGS->target);
     openOutput(intermediate, MAINARGS);
-    fclose(intermediate);
-    remove(temp);
+    if (temp[0])
+        fclose(intermediate);
+        remove(temp);
     return resCode;
 }
 
