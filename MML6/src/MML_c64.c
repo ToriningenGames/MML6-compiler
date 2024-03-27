@@ -1,19 +1,8 @@
-//gb target
-//Allows outputting MML to the gameboy engine
+//c64 target
+//Allows outputting MML to the commodore 64 engine
 
-//2018-10-31:
-    //Empty channels crash program (fixed)
-    //Loop indicies aren't actually assigned (fixed)
-    //Channel 3 wave isn't assigned (fixed)
-//2018-11-2:
-    //Trailing imply crashes program
-    //Nonzero staccatos crash program (fixed)
-//2018-11-3:
-    //Whole notes overwrite lengths with the incorrect value (1 instead of 255) (fixed)
-    //Loop node length assignments not considering rests (fixed)
-//2019-1-19:
-    //Added support for labels
-    //Loop offsets following the loop's jump point don't consider length directives
+//2024-03-26: Initial
+        //Copied from the gb form
 
 #include <stdlib.h>
 #include <stdio.h>
@@ -26,111 +15,6 @@
 #define high4(X) ((uint8_t)X)>>4
 #define low4(X) ((uint8_t)X)&0x0F
 
-/*
- * Idea: Length blocks
- * Since loops will only come from and go to well-defined places,
- * directives can be blocked together with which lengths they will use.
- * Then, control flow can be analyzed to determine where to put length directive
- * Since al length locations are equivalent, it doesn't matter which block we
- * process first, only the order (in how they relate to one another)
- * Starting from the last block sounds like a good idea,
- * since assignments won't determine later blocks'.
- * The block can also see which lengths will be available to it from previous
- * blocks, and declare where those lengths be stored. Further blocks will need
- * to read this and act upon it.
- * The only lengths that will be available will be those from ALL input sources;
- * there could be many jumps to the beginning label, or natural runin.
- * Thankfully, loop leaps won't interfere, so lengths can be done before,
- * allowing for efficient loop leaps.
- * Since a block may jump to its own beginning, it must consider its own output.
- * This will affect choice of overwriting as well as avaiable lengths.
- * Considering that blocks will only have one proper exit, lookahead can happen.
- * 
- * Or, blocks could encode priority. Each block crates a priority list of their
- * lengths. Then, for a given endpoint, we could generate a master priority list
- * A block could communicate which indicies requested lengths are at,
- * and use this list for overwrite determination.
- * 
- * Proceeding back to front is kind of important, though. Memory usage-wise.
- * How, though? Music is by definition a loop; only the beginning is defined
- * So, our algorithm should be as follows:
- * 
- * Divide input into blocks, with loop jumps and loop labels being the delimiter
- * Determine the used lengths in each block, in order from front to back
- * Determine control flow, by listing which blocks transfer to which.
- * Add an "entry block", containing no lengths, to the first block.
- * Starting with the first block
- * 
- * A given block could have the following:
- *      A list of lengths it itself will use, organized by proximity to front
- *      A list of lengths it uses, organized by proximity to back
- *      A list of lengths it needs to account for
- *      A list of lengths each next block uses, organized by proximity to front
- *      A list of lengths each previous block uses, organized from back
- *      Possibly, a list of index/length pairs previous blocks guarantees output
- *      Possibly, a list of lengths overwritten by a following block
- *      Possibly, a list of index/length pairs required by a following block
- * 
- * Once a block has a length's index and set point known,
- * it should be removed from the list of pending lengths.
- * If a block violates an assumption another block makes,
- * the affected length needs to be re-added to the list.
- * 
- * For a given block with some number of the above, what can we set?
- * 
- * If a parent's priority list is greater than LENCNT and one of our lengths
- * is not in it, we are responsible for setting that length, guaranteed.
- * If our own list is larger than LENCNT,
- * we are responsible for setting some of the values.
- * For every length we overwrite,
- * add it to the overwrite list.
- * If we assume the index of a length no parent has written yet,
- * add to the assumed list.
- * 
- * We can avoid the assumed list, because the ultimate authority is the parent
- * block, which has no luxury to assume anything.
- * The parent block can only be sure to have children, and those children can
- * only be sure to have the parent block, already finished, as a parent.
- * Therefore, we need not consider parents' expectations,
- * since they will already be finished.
- * That statement is completely wrong, but still helps solve a few problems.
- * 
- * If we start with the parent, all lengths can be set, and a definitive length
- * list can be generated for end of block.
- * Child blocks can't be sure of their input, if there are other parents, but
- * a definite list goes a long way in determining what WILL need writing.
- * The parent has better access to what would be better served in overwriting,
- * so a parent's word on what indicies have what lengths has authority over
- * children, so a children's request may be denied.
- * 
- * In order to make sure output lengths have reusability across blocks,
- * a given block needs to ensure a length is the same as any siblings.
- * This only needs to be the same for as far as the length is actually present.
- * For determining this, there needs to be child and parent collections.
- * There needs to be one for checked entrys, and unchecked entrys
- * The current block adds itself to unchecked parents.
- * Then, for an entry in unchecked parents, the current length is looked for.
- * If it not present, the given parent is discarded.
- * Otherwise, all its children are added to unchecked children,
- * if not already present in checked children,
- * and it itself is added to checked parents.
- * Once the unchecked parent queue is empty, the unchecked children are checked
- * If it is empty, addition is done.
- * Otherwise, a child is taken, and all its parents are moved to unchecked,
- * if they are not already in checked.
- * Then, the child is moved to checked.
- * Once the unchecked child queue is empty, the flow moves back to the parents.
- * 
- * It is irrelevant if the children don't use the length, since their children's
- * children may use it, and it could pass through to them.
- * 
- * With this, it's unlikely for a child's assumption to be denied, but a
- * contingency plan is still useful and important.
- * 
- * 
- * Crazy idea, but what if we just follow control flow linearly,
- * and insert directives as needed?
- */
 
 //Given a boolean array, return if exactly one entry is true
 static bool isOne(bool* X, int len)
@@ -145,17 +29,17 @@ static bool isOne(bool* X, int len)
 
 #define inRange(X, Y, Z) (Y <= Z && Y >= X)
 
-#define CHCNT 4         //Does not include control channel 0
+#define CHCNT 3         //Does not include control channel 0
 #define LENCNT 16
-#define LOOPCNT 7
-struct gb_entryData {
-    struct gb_entryData* prev;
-    struct gb_entryData* next;
+#define LOOPCNT 16
+struct entryData {
+    struct entryData* prev;
+    struct entryData* next;
     int line;
     int column;
     int supp;   //Supplementary data, for out of band info. Use if positive
     uint8_t entry;
-    uint8_t bytedata;
+    uint16_t bytedata;
 };
 
 struct length {
@@ -165,12 +49,12 @@ struct length {
 
 //Contains a given loop
 struct loopNode {
-    struct gb_entryData* start; //Where the loop set is
-    struct gb_entryData* dest;  //Where the loop goes to
-    struct gb_entryData* end;   //Where the loop point is
+    struct entryData* start; //Where the loop set is
+    struct entryData* dest;  //Where the loop goes to
+    struct entryData* end;   //Where the loop point is
     struct loopNode** children; //Loops this loop contains
     struct loopNode* parent;    //Loop that contains this loop
-    bool indexOpt[8];       //Available indicies based on user reservations
+    bool indexOpt[LOOPCNT];       //Available indicies based on user reservations
 };
 
 struct base {
@@ -179,27 +63,92 @@ struct base {
 };
 
 
-static struct gb_entryData* HEAD[CHCNT+1];
+static struct entryData* HEAD[CHCNT+1];
+static bool inControl;
 
+static int entryLen(struct entryData *curr);
 static struct loopNode* addChild(struct loopNode* parent);
 static void assignAllParents(struct loopNode* curr, int index);
 static void assignAllChildren(struct loopNode* curr, int index);
 static void killAllChildren(struct loopNode* curr);
-static int seekLength(struct gb_entryData* curr, int* lengths);
-static int insertLength(struct gb_entryData* curr, struct length length);
+static int seekLength(struct entryData* curr, int* lengths);
+static int insertLength(struct entryData* curr, struct length length);
 static void* copy(void* src, size_t size);
 static void* add(void* cur, void* nex);
 static void* pre(void* head, void* prev);
 static void rem(void* tar);
 static void* seekLast(void* start);
-static struct gb_entryData** check(MMLStruct* curr);
+static struct entryData** check(MMLStruct* curr);
 static int lengthAnd(int* restrict dest, const int* restrict src, int size);
-static struct gb_entryData* llcollect(struct gb_entryData* curr, struct loopNode* loopTree);
+static struct entryData* llcollect(struct entryData* curr, struct loopNode* loopTree);
 static void lpIndAssn(struct loopNode* curr);
-static struct gb_entryData* loopLengthMap(struct gb_entryData* curr);
-static int printMML(struct gb_entryData** channels, FILE* outfile);
-int writeMML_gb(MMLStruct* curr, FILE* outfile);
+static struct entryData* loopLengthMap(struct entryData* curr);
+static int printMML(struct entryData** channels, FILE* outfile);
+int writeMML_c64(MMLStruct* curr, FILE* outfile);
 
+
+//Returns how many bytes this one directive will take
+static int entryLen(struct entryData *curr)
+{
+        if (curr->entry >= 0x30) { //Note/rest
+                return 1;
+        }
+        if (curr->entry >= 0x20) { //Loop
+                return 2;
+        }
+        if (curr->entry >= 0x10) { //Length
+                return 2;
+        }
+        if (curr->entry >= 0x08) { //Octave
+                return 1;
+        }
+        if (curr->entry == 0x03) { //Tempo
+                return 2;
+        }
+        if (curr->entry == 0x04) { //Control/Filter Enable
+                return 2;
+        }
+        if (curr->entry == 0x05) { //ADSR/Volume
+                return inControl ? 2 : 3;
+        }
+        if (curr->entry & 0xFE == 0x06) { //Waveform/Phase
+                return 3;
+        }
+        if (curr->entry == 0x02) { //Virbrato/Tremolo
+                return 2;
+        }
+        if (curr->entry == 0x01) { //Sweep
+                return 2;
+        }
+        if (curr->entry == 0x00) { //Tie/Filter
+                return inControl ? 2 : 1;
+        }
+        return -1;      //Invalid
+}
+
+static int MMLStructLen(MMLStruct *curr)
+{
+        switch (curr->kind) {
+                case dir_note :
+                case dir_rest :
+                case dir_octave :
+                        return 1;
+                case dir_loop :
+                case dir_control :
+                case dir_sweep :
+                case dir_wobble :
+                        return 2;
+                case dir_volume :
+                case dir_instrument :
+                        return inControl ? 2 : 3;
+                case dir_channel :
+                case dir_label :
+                default :
+                        return 0;
+                case dir_tempo :
+                        return curr->primaryVal ? 2 : 1;
+        }
+}
 
 //Creates and returns a new child for a given loopNode
 static struct loopNode* addChild(struct loopNode* parent) {
@@ -211,11 +160,11 @@ static struct loopNode* addChild(struct loopNode* parent) {
         parent->children[childCount+1] = NULL;  //Set end
         parent->children[childCount]->parent = parent;
         parent = parent->children[childCount];  //New parent!
-        memcpy(parent->indexOpt, parent->parent->indexOpt, 8);  //Inherit available spots from parent
+        memcpy(parent->indexOpt, parent->parent->indexOpt, LOOPCNT);  //Inherit available spots from parent
     } else {
         parent = malloc(sizeof(struct loopNode));
         parent->parent = NULL;
-        memset(parent->indexOpt, true, 8);
+        memset(parent->indexOpt, true, LOOPCNT);
     }
     parent->children = malloc(sizeof(struct loopNode*));
     parent->children[0] = NULL;
@@ -249,7 +198,7 @@ static void killAllChildren(struct loopNode* curr) {
 }
 
 //Given a stream position and a current length list, finds the best index to overwrite
-static int seekLength(struct gb_entryData* curr, int* lengths) {
+static int seekLength(struct entryData* curr, int* lengths) {
     //First check for open indicies
     for (int i = 0; i < LENCNT; i++) {
         if (lengths[i] == -1)
@@ -283,8 +232,8 @@ static int seekLength(struct gb_entryData* curr, int* lengths) {
 }
 
 //Creates a copy of add before this entry
-static struct gb_entryData* insertDirective(struct gb_entryData* curr, struct gb_entryData* add) {
-    struct gb_entryData* prev = malloc(sizeof(struct gb_entryData));
+static struct entryData* insertDirective(struct entryData* curr, struct entryData* add) {
+    struct entryData* prev = malloc(sizeof(struct entryData));
     *prev = *add;
     if (curr) {
         prev->prev = curr->prev;
@@ -299,8 +248,8 @@ static struct gb_entryData* insertDirective(struct gb_entryData* curr, struct gb
 }
 
 //Inserts a length directive before this entry
-static int insertLength(struct gb_entryData* curr, struct length length) {
-    struct gb_entryData newEntry = {
+static int insertLength(struct entryData* curr, struct length length) {
+    struct entryData newEntry = {
         .supp = 0,
         .entry = 0x10 | length.index,
         .bytedata = length.size,
@@ -378,11 +327,11 @@ static void* seekFirst(void* start) {
     return curr;
 }
 
-static struct gb_entryData** check(MMLStruct* curr) {
+static struct entryData** check(MMLStruct* curr) {
     //Check for null input
     if (!curr) return NULL;
     //Compile each directive, with an alternate note format
-    struct gb_entryData dummy = {
+    struct entryData dummy = {
         .prev = NULL,
         .next = NULL,
         .line = -1,
@@ -391,14 +340,12 @@ static struct gb_entryData** check(MMLStruct* curr) {
         .entry = 0,
         .bytedata = 0
     };
-    HEAD[0] = copy(&dummy, sizeof(struct gb_entryData));
-    HEAD[1] = copy(&dummy, sizeof(struct gb_entryData));
-    HEAD[2] = copy(&dummy, sizeof(struct gb_entryData));
-    HEAD[3] = copy(&dummy, sizeof(struct gb_entryData));
-    HEAD[4] = copy(&dummy, sizeof(struct gb_entryData));
-    struct gb_entryData* thisEnt = HEAD[0];
+    for (int i = 0; i < CHCNT + 1; i++) {
+            HEAD[i] = copy(&dummy, sizeof(struct entryData));
+    }
+    struct entryData* thisEnt = HEAD[0];
     for (; curr; curr=curr->next) {
-        thisEnt = add(thisEnt, malloc(sizeof(struct gb_entryData)));
+        thisEnt = add(thisEnt, malloc(sizeof(struct entryData)));
         thisEnt->supp = -1;
         thisEnt->entry = 0;
         thisEnt->bytedata = 0;
@@ -417,73 +364,93 @@ static struct gb_entryData** check(MMLStruct* curr) {
                     thisEnt->entry = (curr->notePitch + 3)<<4;
                     thisEnt->bytedata = 255;
                     totalLen -= 255;
-                    thisEnt = add(thisEnt, malloc(sizeof(struct gb_entryData)));
-                    thisEnt->entry = 0x03;  //Special tempo
-                    thisEnt->bytedata = 0;
-                    thisEnt = add(thisEnt, malloc(sizeof(struct gb_entryData)));
+                    thisEnt = add(thisEnt, malloc(sizeof(struct entryData)));
+                    thisEnt->entry = 0x00;  //Tie
+                    thisEnt->bytedata = -1;
+                    thisEnt = add(thisEnt, malloc(sizeof(struct entryData)));
                 }
                 //Normal note
                 thisEnt->entry = (curr->notePitch + 3)<<4;
                 thisEnt->bytedata = (uint8_t)totalLen;
                 break;
             case dir_volume:
-                thisEnt->entry = 0x01;
-                if (!inRange(0, curr->primaryVal, 255))
-                    fail(curr->line, curr->column, "volume out of range");
-                thisEnt->bytedata = curr->primaryVal;
-                if (!inRange(-2, curr->secondVal, 15))
-                    fail(curr->line, curr->column, "volume supplement out of range");
-                if (curr->secondVal != -2) {
-                    //Second value split is at bit 4
-                    thisEnt->bytedata = curr->primaryVal << 4 | curr->secondVal;
+                thisEnt->entry = 0x05;
+                if (inControl) {
+                    if (!inRange(0, curr->primaryVal, 15))
+                        fail(curr->line, curr->column, "Volume out of range");
+                } else {
+                    if (!inRange(0, curr->primaryVal, 0xFFFF))
+                        fail(curr->line, curr->column, "ADSR out of range");
                 }
+                thisEnt->bytedata = curr->primaryVal;
                 break;
             case dir_sweep:
-                thisEnt->entry = 0x00;
+                thisEnt->entry = 0x01;
                 if (!inRange(0, curr->primaryVal, 255))
                     fail(curr->line, curr->column, "sweep out of range");
                 thisEnt->bytedata = curr->primaryVal;
-                if (!inRange(-2, curr->secondVal, 15))
-                    fail(curr->line, curr->column, "sweep supplement out of range");
-                if (curr->secondVal != -2) {
-                    //Second value split is at bit 4
-                    thisEnt->bytedata = curr->primaryVal << 4 | curr->secondVal;
+                if (!curr->isUp) {
+                    thisEnt->bytedata *= -1;
                 }
                 break;
             case dir_tempo:
+                if (!curr->primaryVal) {
+                    //Actually a tie
+                    if (inControl)
+                        fail(curr->line, curr->column, "Tie within control channel");
+                    thisEnt->entry = 0;
+                    break;
+                }
                 thisEnt->entry = 0x03;
                 if (!inRange(0, curr->primaryVal, 255))
                 fail(curr->line, curr->column, "tempo out of range");
                 thisEnt->bytedata = curr->primaryVal;
                 break;
             case dir_octave:
-                thisEnt->entry = 0x20;
-                if (!inRange(0, curr->primaryVal, 15))
+                thisEnt->entry = 0x08;
+                if (!inRange(0, curr->primaryVal, 7))
                 fail(curr->line, curr->column, "octave out of range");
                 thisEnt->entry |= curr->primaryVal;
                 thisEnt->bytedata = 0;
                 break;
             case dir_instrument:
-                thisEnt->entry = 0x04;
-                if (!inRange(0, curr->primaryVal, 3))
-                fail(curr->line, curr->column, "instrument out of range");
-                if (curr->secondVal == -2) {
-                    thisEnt->bytedata = curr->primaryVal;
+                if (inControl) {
+                    if (!inRange(-2, curr->secondVal, 15))
+                        fail(curr->line, curr->column, "resonance out of range");
+                    if (!inRange(0, curr->primaryVal, 127))
+                        fail(curr->line, curr->column, "invalid filter");
+                    if (curr->secondVal >= 0 && curr->primaryVal > 7)
+                        fail(curr->line, curr->column, "invalid filter");
+                    thisEnt->entry = 0x00;
+                    thisEnt->bytedata = curr->secondVal >= 0 ? curr->secondVal : 0;
+                    thisEnt->bytedata |= curr->primaryVal << (curr->secondVal >= 0 ? 4 : 0);
                 } else {
-                    if (!inRange(0, curr->primaryVal, 255))
-                    fail(curr->line, curr->column, "wave instrument out of range");
-                    thisEnt->bytedata = curr->secondVal;
+                    if (curr->secondVal > 0x0FFF)
+                        fail(curr->line, curr->column, "invalid phase");
+                    if (!inRange(0, curr->primaryVal, 15))
+                        fail(curr->line, curr->column, "invalid wave spec");
+                    thisEnt->entry = 0x06 + !!(curr->isUp);
+                    thisEnt->bytedata = curr->secondVal >= 0 ? curr->secondVal : 0x0800;
+                    thisEnt->bytedata |= (curr->primaryVal & 0x0F) << 12;
                 }
-                thisEnt->entry |= curr->primaryVal;
                 break;
-            case dir_stacatto:
+            case dir_wobble:
+                if (!inRange(0, curr->primaryVal, 0xFF))
+                    fail(curr->line, curr->column, "wobble out of range");
+                if (!inRange(-2, curr->secondVal, 0x0F))
+                    fail(curr->line, curr->column, "wobble out of range");
                 thisEnt->entry = 0x02;
-                if (!inRange(0, curr->primaryVal, 255))
-                fail(curr->line, curr->column, "stacatto out of range");
+                thisEnt->bytedata = curr->secondVal < 0 ? 0 : curr->secondVal;
+                thisEnt->bytedata |= curr->primaryVal << (curr->secondVal < 0 ? 0 : 4);
+                break;
+            case dir_control:
+                if (!inRange(0, curr->primaryVal, 0x0F))
+                    fail(curr->line, curr->column, "control out of range");
+                thisEnt->entry = 0x04;
                 thisEnt->bytedata = curr->primaryVal;
                 break;
             case dir_loop:
-                thisEnt->entry = 0x08;
+                thisEnt->entry = 0x20;
                 if (!inRange(-2, curr->secondVal, LOOPCNT-1))
                     fail(curr->line, curr->column, "loop index out of range");
                 if (!inRange(0, curr->primaryVal, 127) && curr->isaLoopSet)
@@ -491,16 +458,19 @@ static struct gb_entryData** check(MMLStruct* curr) {
                 thisEnt->bytedata = curr->primaryVal & 0x7F;
                 thisEnt->supp = curr->primaryVal;
                 thisEnt->bytedata |= 0x80 * (!curr->isaLoopSet);
-                if (curr->secondVal != -2) thisEnt->entry |= curr->secondVal;
+                if (curr->secondVal >= 0) thisEnt->entry |= curr->secondVal;
                 break;
             case dir_channel:
                 //Change fill channel
                 thisEnt = thisEnt->prev;
                 rem(thisEnt->next);
-                if (!inRange(0, curr->primaryVal, CHCNT)) {
+                if (!inRange(0, curr->primaryVal, CHCNT))
                     fail(curr->line, curr->column, "invalid channel number");
-                }
                 thisEnt = HEAD[curr->primaryVal];
+                //Append to channel
+                while (thisEnt->next)
+                    thisEnt = thisEnt->next;
+                inControl = !curr->primaryVal;
                 break;
             case dir_label:
                 //Label; these are not output to file, but stored for loop use
@@ -528,11 +498,11 @@ static struct gb_entryData** check(MMLStruct* curr) {
 }
 
 //Loop once: collect loops
-static struct gb_entryData* llcollect(struct gb_entryData* curr, struct loopNode* loopTree) {
-    struct gb_entryData* start = curr;
+static struct entryData* llcollect(struct entryData* curr, struct loopNode* loopTree) {
+    struct entryData* start = curr;
     for (; curr; curr = curr->next) {
         //Is loop?
-        if (inRange(0x08, curr->entry, 0x0F)) {
+        if (inRange(0x20, curr->entry, 0x2F)) {
             //Is loop end?
             if (curr->bytedata >= 0x80) {
                 //yes
@@ -546,7 +516,7 @@ static struct gb_entryData* llcollect(struct gb_entryData* curr, struct loopNode
                 loopTree = addChild(loopTree);
                 loopTree->start = curr;
                 //Set the destination pointer
-                struct gb_entryData* end = curr->next;
+                struct entryData* end = curr->next;
                 for (; end && loopTree->start->supp != end->supp; end = end->next)
                     ;
                 loopTree->dest = end;
@@ -562,11 +532,11 @@ static void lpIndAssn(struct loopNode* curr) {
     assert(curr);
     assert(curr->start);
     assert(curr->end);
-    if (curr->start->entry == 8)
+    if (curr->start->entry == LOOPCNT)
         curr->start->entry = curr->end->entry;
-    if (curr->end->entry == 8)
+    if (curr->end->entry == LOOPCNT)
         curr->end->entry = curr->start->entry;
-    if (curr->start->entry == 8) {
+    if (curr->start->entry == LOOPCNT) {
         //Does not have preassigned loop
         uint8_t index = 0;
         //Find first index
@@ -591,27 +561,27 @@ static void printTree(struct loopNode* head) {
 }
 
 //Sets all lengths
-static struct gb_entryData* lengthMap(struct gb_entryData* curr) {
+static struct entryData* lengthMap(struct entryData* curr) {
     int lengths[LENCNT];
     memset(lengths, -1, LENCNT * sizeof(int));
-    struct gb_entryData* start = curr;
+    struct entryData* start = curr;
     struct loopJump {
-        struct gb_entryData* start;
-        struct gb_entryData* end;
+        struct entryData* start;
+        struct entryData* end;
     }* finLoops = malloc(sizeof(struct loopJump));
     int finLoopssize = 0;
-    struct gb_entryData* loopSources[LOOPCNT];
+    struct entryData* loopSources[LOOPCNT];
     for (int i = 0; i < LOOPCNT; i++) {
         loopSources[i] = NULL;
     }
     for (; curr; curr = curr->next) {
         //Is loop?
-        if (inRange(8, curr->entry, 15)) {
+        if (inRange(0x20, curr->entry, 0x2F)) {
             //Is loop end?
             if (curr->bytedata >= 0x80) {
                 //yes
                 //Follow the matching loop
-                struct loopJump thisLoop = {loopSources[curr->entry & 0x07], curr};
+                struct loopJump thisLoop = {loopSources[curr->entry & 0x0F], curr};
                 //If we already followed this, don't do it twice.
                 for (int i = finLoopssize-1; i >= 0; i--) {
                     if ((finLoops[i].start == thisLoop.start) && (finLoops[i].end == thisLoop.end)) {
@@ -643,7 +613,7 @@ static struct gb_entryData* lengthMap(struct gb_entryData* curr) {
             } else {
                 //no
                 //Set this loop
-                loopSources[curr->entry & 0x07] = curr;
+                loopSources[curr->entry & 0x0F] = curr;
             }
         } else if (curr->entry >= 0x30) {   //Is note?
             //yes
@@ -672,7 +642,7 @@ static struct gb_entryData* lengthMap(struct gb_entryData* curr) {
 }
 
 //Sets all loop indicies
-static struct gb_entryData* loopMap(struct gb_entryData* curr) {
+static struct entryData* loopMap(struct entryData* curr) {
     //Shortcut if no input
     if (!curr) return NULL;
     struct loopNode* dummy = addChild(NULL);
@@ -687,33 +657,31 @@ static struct gb_entryData* loopMap(struct gb_entryData* curr) {
     return curr;
 }
 
-static int printMML(struct gb_entryData** channels, FILE* outfile) {
+static int printMML(struct entryData** channels, FILE* outfile) {
     //Constant header size
     int offset = (CHCNT+1) * 2;
     //Count bytes in each channel
-    for (int ch = 0; ch < CHCNT; ch++) {
+    for (int ch = 0; ch <= CHCNT; ch++) {
+        inControl = !ch;
         fwrite(&offset, 2, 1, outfile); //Channel start
-        for (struct gb_entryData* curr = channels[ch]; curr; curr = curr->next) {
-            //Nondirectives don't get written
-            if (!curr->entry && !curr->bytedata && curr->supp >= 0)
-                continue;
-            offset++;
-            if (curr->entry < 0x20) offset++;
+        for (struct entryData* curr = channels[ch]; curr; curr = curr->next) {
+            offset += entryLen(curr);
         }
         if (offset > 0xFFFF) {
             fail(0, 0, "song too huge");
         }
     }
-    fwrite(&offset, 2, 1, outfile); //Channel 4 start
     //Header printed
     //Print each channel's contents
     for (int ch = 0; ch <= CHCNT; ch++) {
-        for (struct gb_entryData* curr = channels[ch]; curr; curr = curr->next) {
+        inControl = !ch;
+        for (struct entryData* curr = channels[ch]; curr; curr = curr->next) {
             //Do not write labels
             if (!curr->entry && !curr->bytedata && curr->supp != -1)
                 continue;
             fwrite(&curr->entry, 1, 1, outfile);
-            if (curr->entry < 0x20) fwrite(&curr->bytedata, 1, 1, outfile);
+            if (entryLen(curr) == 3) fwrite(&curr->bytedata+1, 1, 1, outfile);
+            if (entryLen(curr) >= 2) fwrite(&curr->bytedata, 1, 1, outfile);
         }
     }
     return offset;
@@ -722,7 +690,7 @@ static int printMML(struct gb_entryData** channels, FILE* outfile) {
 struct jump {
     struct jump* prev;
     struct jump* next;
-    struct gb_entryData* loopset;
+    struct entryData* loopset;
     int byteSpan;
 };
 
@@ -761,7 +729,7 @@ static struct jump* sortJump(struct jump* list) {
 
 
 //Converts from loops and labels to loops and offsets
-static int lenOffsetAdj(struct gb_entryData* curr) {
+static int lenOffsetAdj(struct entryData* curr) {
     //Adding one springboard will affect all jumps that jump over it.
     //Assuming we add them in the order they'd appear in file, their placement
     //can be known when we reach them.
@@ -803,7 +771,7 @@ static int lenOffsetAdj(struct gb_entryData* curr) {
             //Do not count labels; they are not output
             continue;
         };
-        if (inRange(0x08, curr->entry, 0x0F) && curr->bytedata < 0x80) {
+        if (inRange(0x20, curr->entry, 0x2F) && curr->bytedata < 0x80) {
             //Loop set
             struct jump* newJmp = malloc(sizeof(struct jump));
             newJmp->next = newJmp->prev = NULL;
@@ -814,17 +782,11 @@ static int lenOffsetAdj(struct gb_entryData* curr) {
             for (struct jump* thisJmp = jmpList; thisJmp; thisJmp = thisJmp->next) {
                 thisJmp->byteSpan+=2;
             }
-        } else if (inRange(0x00, curr->entry, 0x1F)) {
-            //Sweep, Envelope, Stacatto, Tempo, Tone, Length, Loops
-            //Count two bytes
-            for (struct jump* thisJmp = jmpList; thisJmp; thisJmp = thisJmp->next) {
-                thisJmp->byteSpan+=2;
-            }
         } else {
             //Every other directive
-            //Count one byte
+            //Count bytes
             for (struct jump* thisJmp = jmpList; thisJmp; thisJmp = thisJmp->next) {
-                thisJmp->byteSpan++;
+                thisJmp->byteSpan += entryLen(curr);
             }
         }
         
@@ -860,7 +822,7 @@ static int lenOffsetAdj(struct gb_entryData* curr) {
             int threshold = 127 - 4 * (jmpCnt + 1);
             //Place a springboard one byte early if next is not size 1
             if (curr->next)
-                threshold -= !inRange(0x20, curr->next->entry, 0xFF);
+                threshold -= entryLen(curr)-1;
             for (; jmpChk; jmpChk = jmpChk->next) {
                 if (jmpChk->byteSpan >= threshold) {
                     break;
@@ -874,8 +836,8 @@ static int lenOffsetAdj(struct gb_entryData* curr) {
                 curr = curr->next;
                 //Place the guard
                 //Setloop
-                struct gb_entryData spring = {0};
-                spring.entry = 0x0F;
+                struct entryData spring = {0};
+                spring.entry = 0x20;
                 spring.bytedata = 0x00 | ((jmpCnt + 1) * 4);
                 spring.supp = -1;
                 insertDirective(curr, &spring);
@@ -923,12 +885,14 @@ static int lenOffsetAdj(struct gb_entryData* curr) {
     return 0;
 }
 
-int writeMML_gb(MMLStruct* curr, FILE* outfile) {
+int writeMML_c64(MMLStruct* curr, FILE* outfile) {
     if (!check(curr)) {
         return -1;
     };
     //Assign loop indicies and length indicies
     for (int ch = 0; ch <= CHCNT; ch++) {
+        if (!HEAD[ch]) continue;
+        inControl = !ch;
         HEAD[ch] = loopMap(HEAD[ch]);
         HEAD[ch] = lengthMap(HEAD[ch]);
         //Adjust loop offsets to count actual bytes

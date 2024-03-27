@@ -1,78 +1,56 @@
-//Memory light interpreted MML format
-/*
- * Binary entry format
- * %TTTTxxxx
- *  ||||++++--- subspecifier
- *  ++++------- Type
- * 
- * Types between 4-15 are notes:
- *      The value is the number of half-steps above the base note of the current octave, plus 4
- *      The subspecifier is a reference to the note's length, set via the length table setter
- *      And so on.
- * Other things to accomodate:
- *    > Rests
- *    > Volume
- *      Tone (duty/wave)
- *    > Octave control
- *      Loops
- *      Sweep
- *      Envelope
- *      Panning
- *      Global volume
- * 
- * Calculating pitch based on a general octave sounds like precision hell, so
- * Look up table! Octave can be multiplied by 12 and shifted by the size of a pitch
- * Then, each note could be shifted+added in, referencing a pitch
- * The pitch table base could additionally be configurable, allowing any pitch sets
- * 
- * Length: Stored as however many 256ths of a measure a given length is
- *      16 locations to store this in
- * Optimisation technique:
- *      Decide which note lengths to override based on proximity: go for the note 
- *      length that's furthest away from here
- * 
- * Remaining types:
- *      0: Other
- *          Subspecifier type:
- *              1xxx: Loop
- *                  xxx: Loop index
- *                  Byte data: Hi bit: setloop/ goto
- *                      If setloop, unsigned offset from loop directive to destination
- *                      If goto, number of times to loop. 0 indicates infinite looping
- *              01xx: Tone change
- *                  xx: Channel 1/2 duty
- *                  Byte data: Channel 3 wave index
- *              0011: Tempo change
- *                  Byte data: BPM, 0 to append next note (tie)
- *              0010: Auto Length (for stacatto)
- *                  Byte data: value to set Counter to, 0 to disable
- *                      High two bits omitted when not channel 3
- *                      If control channel, set global panning
- *              0001: Envelope
- *                  Byte data: Envelope data
- *                      If control channel, Master volume data
- *              0000: Sweep
- *                  Byte data: Sweep data
- *                      If control channel, toggle a channel's panning
- *                          Bits 0-1: Affected channel
- *                          Bit 2:    L/R select
- *                          Bit 3:    If 0, output is toggled. Otherwise, bit 4 applies
- *                          Bit 4:    Value to apply (1==on)
- *      1: Length change
- *          Subspecifier: Length index to change
- *          Byte data: New length value
- *      2: Octave
- *          Subspecifier: Octave no.
- *      3: Rest
- *          Subspecifier: length
- * 
- * Header format:
- * For each channel:
- * 2 bytes =  Channel start offset from beginning of file
- */
+## Binary entry format
+```
+%TTTTxxxx
+ ||||++++--- subspecifier
+ ++++------- Type
+```
+Types between 4-15 are notes:
+     The value is the number of half-steps above the base note of the current octave, plus 4.
+     The subspecifier is a reference to the note's length, set via the length table setter.
+
+Length: Stored as however many 256ths of a measure a given length is
+     16 locations to store this in
+
+Remaining types:
+     0: Other
+         Subspecifier type:
+             1xxx: Loop
+                 xxx: Loop index
+                 Byte data: Hi bit: setloop/ goto
+                     If setloop, unsigned offset from loop directive to destination
+                     If goto, number of times to loop. 0 indicates infinite looping
+             01xx: Tone change
+                 xx: Channel 1/2 duty
+                 Byte data: Channel 3 wave index
+             0011: Tempo change
+                 Byte data: BPM, 0 to append next note (tie)
+             0010: Auto Length (for stacatto)
+                 Byte data: value to set Counter to, 0 to disable
+                     High two bits omitted when not channel 3
+                     If control channel, set global panning
+             0001: Envelope
+                 Byte data: Envelope data
+                     If control channel, Master volume data
+             0000: Sweep
+                 Byte data: Sweep data
+                     If control channel, toggle a channel's panning
+                         Bits 0-1: Affected channel
+                         Bit 2:    L/R select
+                         Bit 3:    If 0, output is toggled. Otherwise, bit 4 applies
+                         Bit 4:    Value to apply (1==on)
+     1: Length change
+         Subspecifier: Length index to change
+         Byte data: New length value
+     2: Octave
+         Subspecifier: Octave no.
+     3: Rest
+         Subspecifier: length
+
+Header format:
+For each channel:
+2 bytes =  Channel start offset from beginning of file
 
 
-/*
 MML text format:
 All entries are a character with a number following. Valid characters are:
     A-G:    Note declaration
@@ -164,4 +142,3 @@ Note on loops:
     This is so that you can have overlapping loops, but you are responsible for index allocation
     Compilers will also assume fully contained loops, so anything affected by looping (e.g. GB's length messages) will be screwed over
     Additionally, setting index to max is invalid
-*/

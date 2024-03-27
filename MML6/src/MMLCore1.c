@@ -1,6 +1,8 @@
 //MML v6 (identical to v5)
 //2019.01.19 ver 6.1
     //Added labels (: directive)
+//2024.03.26 ver 6.5
+    //Added several directives to work across GB and SID
 
 #include <stddef.h>
 #include <stdlib.h>
@@ -60,6 +62,8 @@ enum directive parseNewDir(char* text) {
     if (*text == '<'
         || *text == '>') return dir_octShift;
     if (*text == ':') return dir_label;
+    if (*text == 'W') return dir_wobble;
+    if (*text == 'Q') return dir_control;
     return -1;
 }
 
@@ -288,15 +292,25 @@ struct token* parser(struct string_base* instring) {
         }
         curr->notePitch = fillExtraData(string->word);
         i++;
-        //Look for + or - (only valid for notes)
+        //Look for + or - (only valid for notes and some controls)
+        if (curr->kind == dir_sweep || curr->kind == dir_instrument) {
+            curr->isUp = true;
+        }
         if (string->word[i] == '+' || string->word[i] == '-') {
-            if (curr->kind != dir_note) {
-                fail(string->line, string->column+i, "unexpected '+/-'");
+            switch (curr->kind) {
+                case dir_note :
+                    if (string->word[i] == '+') curr->notePitch++;
+                    if (string->word[i] == '-') curr->notePitch--;
+                    if (curr->notePitch == 0) curr->notePitch = 12;
+                    if (curr->notePitch == 13) curr->notePitch = 1;
+                    break;
+                case dir_sweep :
+                case dir_instrument :
+                    curr->isUp = !string->word[i] == '-';
+                    break;
+                default :
+                    fail(string->line, string->column+i, "unexpected '+/-'");
             }
-            if (string->word[i] == '+') curr->notePitch++;
-            if (string->word[i] == '-') curr->notePitch--;
-            if (curr->notePitch == 0) curr->notePitch = 12;
-            if (curr->notePitch == 13) curr->notePitch = 1;
             i++;
         }
         //Look for base sign

@@ -93,6 +93,7 @@ int writeMML_self(struct token* curr, FILE* outfile) {
             break;
             default :
             fputs("# unknown directive", outfile);    //Output comment for unknown inputs
+            prettyChannel = true;
             break;
         }
         if (curr->primaryVal != -1) {

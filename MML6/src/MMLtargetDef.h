@@ -8,15 +8,18 @@
 #define STR(X) _STR(X)
 //These are convenient macros for version information
 #define VER_MAJ 6
-#define VER_MIN 3
+#define VER_MIN 4
 #define VER STR(VER_MAJ) "." STR(VER_MIN)
 
 //Add your platform name to the end here
-enum platform { pt_none, pt_self, pt_gameboy };
+enum platform { pt_none, pt_self, pt_gameboy, pt_c64 };
 
 
 enum directive { dir_none, dir_octShift, dir_imply, dir_macro, //You won't see these
-    dir_note, dir_volume, dir_sweep, dir_tempo, dir_octave, dir_instrument, dir_stacatto, dir_loop, dir_channel, dir_rest, dir_label,
+    dir_note, dir_tempo, dir_octave, dir_loop, dir_channel, dir_rest, dir_label, //General directives; are the same everywhere
+    dir_instrument, dir_volume, dir_sweep, //Specific directves; meaning and availability differ depending on platform
+    dir_stacatto, //GB-specific directives
+    dir_wobble, dir_control, //SID-specific directives
     dir_error = -1 };   //I hope you don't see this
 
 typedef struct token {
@@ -44,6 +47,7 @@ extern void clrMMLStruct(MMLStruct* start);
 extern int writeMML_none(struct token* curr, FILE* outfile);
 extern int writeMML_self(struct token* curr, FILE* outfile);
 extern int writeMML_gb(struct token* curr, FILE* outfile);
+extern int writeMML_c64(struct token* curr, FILE* outfile);
 
 extern void fail(int line, int column, char* message);
 extern void warn(int line, int column, char* message);

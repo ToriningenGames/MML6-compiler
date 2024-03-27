@@ -1,3 +1,4 @@
 {pt_self, writeMML_self, "self"},
 {pt_gameboy, writeMML_gb, "gb"},
+{pt_c64, writeMML_c64, "c64"},
 {pt_none, writeMML_none, "none"},

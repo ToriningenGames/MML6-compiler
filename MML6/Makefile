@@ -1,49 +1,35 @@
-OBJDIR=obj/
-BINDIR=bin/
-SRCDIR=src/
-override CFLAGS += --std=c11 -c
-RFLAGS= -O1 -DNDEBUG
-DFLAGS= -Wall -Wextra -Wno-implicit-fallthrough -Og -g3
-LDFLAGS= 
-BIN=MML6.exe
-TARGETSRC=MML_MML MML_gb
-CORESRC=CompileMML MMLCore1 Optimise
-SRC=$(CORESRC) $(TARGETSRC)
-CC=cc
+OBJDIR=obj
+BINDIR=bin
+SRCDIR=src
+SRCS_MML=CompileMML.c MML_gb.c MML_c64.c MML_MML.c MMLCore1.c Optimise.c
+SRCS_COMPARE=Compare.c
+SRCS=$(SRCS_MML) $(SRCS_COMPARE)
+#Autodepends, a la https://make.mad-scientist.net/papers/advanced-auto-dependency-generation/
 
-vpath %.c $(SRCDIR)
+all : $(BINDIR)/MML6 $(BINDIR)/mmlcompare
 
-.SUFFIXES:
+DEPDIR=.deps
+DEPFLAGS= -MT $@ -MMD -MP -MF $(DEPDIR)/$*.d
+COMPILE.c = $(CC) $(DEPFLAGS) $(CFLAGS) $(CPPFLAGS) $(TARGET_ARCH) -c
 
-.PHONY : all release debug clean common compare
+$(OBJDIR)/%.o : $(SRCDIR)/%.c $(DEPDIR)/%.d | $(DEPDIR) $(OBJDIR)
+	$(COMPILE.c) $(OUTPUT_OPTION) $<
 
-all : release debug
+DEPFILES := $(SRCS:%.c=$(DEPDIR)/%.d)
+$(DEPFILES):
 
-release : CFLAGS:=$(CFLAGS) $(RFLAGS)
-release : PRE:=
-release :
-	$(MAKE) '$(BINDIR)$(BIN)' CFLAGS='$(CFLAGS)'
-	$(MAKE) 'compare' CFLAGS='$(CFLAGS)'
+$(BINDIR)/MML6 : $(SRCS_MML:%.c=$(OBJDIR)/%.o) | $(BINDIR)
+	$(CC) $(LDFLAGS) -o $@ $^
 
-debug : CFLAGS:=$(CFLAGS) $(DFLAGS)
-debug : PRE:=debug-
-debug :
-	$(MAKE) '$(BINDIR)$(PRE)$(BIN)' CFLAGS='$(CFLAGS)' PRE='$(PRE)'
-	$(MAKE) 'compare' CFLAGS='$(CFLAGS)' PRE='$(PRE)'
-
-compare : $(BINDIR)$(PRE)mmlcompare.exe
-
-$(BINDIR)$(PRE)mmlcompare.exe : $(OBJDIR)$(PRE)Compare.o
-	$(CC) $(LDFLAGS) $^ -o $@
-
-$(BINDIR)$(PRE)$(BIN) : $(addprefix $(OBJDIR)$(PRE),$(addsuffix .o,$(SRC)))
-	$(CC) $(LDFLAGS) $^ -o $@
-
-$(OBJDIR)$(PRE)%.o : %.c
-	$(CC) $(CFLAGS) $< -o $@
-
-bin obj :
-	mkdir $@
+$(BINDIR)/mmlcompare : $(SRCS_COMPARE:%.c=$(OBJDIR)/%.o) | $(BINDIR)
+	$(CC) $(LDFLAGS) -o $@ $^
 
 clean :
-	del /S /Q bin obj
+	$(RM) -r $(OBJDIR) $(BINDIR)
+
+$(DEPDIR) $(BINDIR) $(OBJDIR) : 
+	mkdir $@
+
+.PHONY : all clean
+
+include $(wildcard $(DEPFILES))
