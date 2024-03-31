@@ -55,6 +55,9 @@ SIDflt  INSTANCEOF SIDFilter_st
 SIDmisc INSTANCEOF SIDMisc_st
 .ENDE
 
+
+;VIC-II
+
 .STRUCT Sprite_st
 X       db
 Y       db
