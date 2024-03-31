@@ -68,6 +68,23 @@ DreanFreq:
  .dw $70B3,$7767,$7E81,$8606,$8DFE,$9670,$9F62,$A8DC,$B2E7,$BD8A,$C8D0,$D4C0
 .ENDS
 
+.SECTION "Percussion" FREE
+;    Freq  ADSR  Phase Control  Time
+PercData:
+ .dw $0000,$0000,$0000,$0000  ;A  (None)
+ .dw $0000,$0000,$0000,$0000  ;A+ (None)
+ .dw $0000,$0000,$0000,$0000  ;B  (None)
+ .dw $0000,$0000,$0000,$0000  ;C  (None)
+ .dw $0000,$0000,$0000,$0000  ;C+ (None)
+ .dw $0000,$0000,$0000,$0000  ;D  (None)
+ .dw $0000,$0000,$0000,$0000  ;D+ (None)
+ .dw $0000,$0000,$0000,$0000  ;E  (None)
+ .dw $0000,$0000,$0000,$0000  ;F  (None)
+ .dw $0000,$0000,$0000,$0000  ;F+ (None)
+ .dw $0000,$0000,$0000,$0000  ;G  (None)
+ .dw $0000,$0000,$0000,$0000  ;G+ (None)
+.ENDS
+
 .SECTION "Sound Setup" FREE
 
 SoundInit:
@@ -278,17 +295,23 @@ PlayTick:
   RTS
 .ENDIF
 PlayChannel:
-;Check for Sweep, Virbrato, Tremolo
+;Check for Sweep, Virbrato, Tremolo, Percussion Mode
   LDA channel.0.system,X
     PHA
-    AND 1
+    AND #1
     BEQ +
     JSR _doSweep
 +
     PLA
-  AND 2
+    PHA
+    AND #2
+    BEQ +
+    JSR _doWobble
++
+    PLA
+  AND #%01000000
   BEQ +
-  JSR _doWobble
+  JSR _doPerc
 +
 ;Is the note over?
   DEC channel.0.remain,X
@@ -594,8 +617,70 @@ _noTie:
   STA SIDch.0.Control,X
   JMP IOtoRAM
 
+_playPercussion:
+;Get the settings for this note
+  TYA
+  ASL A
+  ASL A
+  ASL A
+  TAY
+  ;Shadows First
+  LDA PercData,Y
+  STA channel.0.freq,X
+  INY
+  LDA PercData,Y
+  STA.w channel.0.freq+1,X
+  INY
+  LDA PercData,Y
+  STA channel.0.adsr,X
+  INY
+  LDA PercData,Y
+  STA.w channel.0.adsr+1,X
+  INY
+  LDA PercData,Y
+  STA channel.0.phase,X
+  INY
+  LDA PercData,Y
+  STA.w channel.0.phase+1,X
+  INY
+  LDA PercData,Y
+  STA channel.0.control,X
+  INY
+  LDA PercData,Y
+  STA channel.0.octave,X
+  DEY
+  ;True SID next
+  JSR RAMtoIO
+  LDA PercData,Y
+  DEY
+    PHA
+    LDA PercData,Y
+    STA.w SIDch.0.PulseWidth+1,X
+    DEY
+    LDA PercData,Y
+    STA SIDch.0.PulseWidth,X
+    DEY
+    LDA PercData,Y
+    STA.w SIDch.0.ADSR+1,X
+    DEY
+    LDA PercData,Y
+    STA SIDch.0.ADSR,X
+    DEY
+    LDA PercData,Y
+    STA.w SIDch.0.Frequency+1,X
+    DEY
+    LDA PercData,Y
+    STA SIDch.0.Frequency,X
+    PLA
+  STA SIDch.0.Control,X
+  JMP IOtoRAM
+
 _playNote:
   TAY
+  ;Percussion mode?
+  LDA channel.0.system,X
+  AND #%01000000
+  BNE _playPercussion
   ;Nab the shadow control
   LDA channel.0.control,X
   STA Temp
@@ -635,7 +720,24 @@ _playNote:
   STA channel.0.freq,X
   LDA Temp+2
   STA.w channel.0.freq+1,X
+-
   RTS
+
+_doPerc:
+;Cut the note off if it's over time
+  LDA channel.0.octave,X
+  BEQ -
+  DEC channel.0.octave,X
+  BNE -
+  ;Time to cut it
+  ;Mind the other bits
+  LDA channel.0.control,X
+  TAY
+  JSR RAMtoIO
+  TYA
+  AND #$FE
+  STA SIDch.0.Control,X
+  JMP IOtoRAM
 
 _doVirbrato:
   LDA channel.0.wobble,X
