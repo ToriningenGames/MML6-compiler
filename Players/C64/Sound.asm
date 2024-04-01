@@ -4,7 +4,7 @@
 ;ZP Defaults fit with KERNAL; define BasicCompat to avoid overwriting BASIC vars
 .DEFINE DIVAREA         $8B     ;5 bytes ZP
 .DEFINE NoteTable       $FB     ;2 bytes ZP
-.DEFINE Temp            $2B     ;4 bytes ZP
+.DEFINE Temp            $2B     ;5 bytes ZP
 .DEFINE SoundState      $2000   ;2 pages, page aligned
 
 .STRUCT LoopLength
@@ -46,10 +46,17 @@ loops   INSTANCEOF LoopLength 4*16
 .ENDE
 
 .MACRO NXT ISOLATED
-  LDA (channel.0.now,X)
-  INC channel.0.now,X
+  LDA channel.1.now,X
+  STA Temp+1
+  LDA.w channel.1.now+1,X
+  STA Temp+2
+  STX Temp+3
+  LDX #$00
+  LDA (Temp+1,X)
+  LDX Temp+3
+  INC channel.1.now,X
   BNE +
-  INC.w channel.0.now+1,X
+  INC.w channel.1.now+1,X
 +
 .ENDM
 
@@ -69,20 +76,21 @@ DreanFreq:
 .ENDS
 
 .SECTION "Percussion" FREE
-;    Freq  ADSR  Phase Control  Time
+;      Freq  ADSR  Phase Control  Time
+.table dw,   dw,   dw,   db,      db
 PercData:
- .dw $0000,$0000,$0000,$0000  ;A  (None)
- .dw $0000,$0000,$0000,$0000  ;A+ (None)
- .dw $0000,$0000,$0000,$0000  ;B  (None)
- .dw $0000,$0000,$0000,$0000  ;C  (None)
- .dw $0000,$0000,$0000,$0000  ;C+ (None)
- .dw $0000,$0000,$0000,$0000  ;D  (None)
- .dw $0000,$0000,$0000,$0000  ;D+ (None)
- .dw $0000,$0000,$0000,$0000  ;E  (None)
- .dw $0000,$0000,$0000,$0000  ;F  (None)
- .dw $0000,$0000,$0000,$0000  ;F+ (None)
- .dw $0000,$0000,$0000,$0000  ;G  (None)
- .dw $0000,$0000,$0000,$0000  ;G+ (None)
+ .row $0000,$0000,$0000,$00,     $00    ;A  (None)
+ .row $0000,$0000,$0000,$00,     $00    ;A+ (None)
+ .row $0000,$0000,$0000,$00,     $00    ;B  (None)
+ .row $0000,$0000,$0000,$00,     $00    ;C  (None)
+ .row $0000,$0000,$0000,$00,     $00    ;C+ (None)
+ .row $0000,$0000,$0000,$00,     $00    ;D  (None)
+ .row $0000,$0000,$0000,$00,     $00    ;D+ (None)
+ .row $0000,$0000,$0000,$00,     $00    ;E  (None)
+ .row $0000,$0000,$0000,$00,     $00    ;F  (None)
+ .row $0000,$0000,$0000,$00,     $00    ;F+ (None)
+ .row $0000,$0000,$0000,$00,     $00    ;G  (None)
+ .row $0000,$0000,$0000,$00,     $00    ;G+ (None)
 .ENDS
 
 .SECTION "Sound Setup" FREE
@@ -217,19 +225,13 @@ NewSong:
   DEX
   BPL -
   ;Wipe memory
-  LDX #__sizeof_MusicChannel*3-1
+  LDX #_sizeof_MusicChannel*3-1
 -
   STA SoundState,X
   DEX
   BPL -
   ;Load in the channel pointers
   LDY #$00
-  LDA (Temp),Y
-  STA channel.0.now
-  INY
-  LDA (Temp),Y
-  STA.w channel.0.now+1
-  INY
   LDA (Temp),Y
   STA channel.1.now
   INY
@@ -247,12 +249,18 @@ NewSong:
   INY
   LDA (Temp),Y
   STA.w channel.3.now+1
+  INY
+  LDA (Temp),Y
+  STA channel.4.now
+  INY
+  LDA (Temp),Y
+  STA.w channel.4.now+1
   ;Make it play next tick
   LDA #$01
-  STA channel.0.remain
   STA channel.1.remain
   STA channel.2.remain
   STA channel.3.remain
+  STA channel.4.remain
   ;Set the tempo to a fine default
   LDA #120
   JMP SetTempo
@@ -267,36 +275,46 @@ PlayTick:
   STA Delay
 .IFDEF BasicCompat
   ;Save the state we overwrite
-  LDX #3
+  LDX #4
 -
   LDA Temp,X
   PHA
   DEX
   BPL -
 .ENDIF
+  ;Make sure our memory/IO is actually there
+  LDA $01
+  STA Temp+4
+  AND #$F8
+  ORA #%00000101
+  STA $01
   ;Play the channels
-  LDX #(channel.0 - SoundState)
-  JSR PlayChannel
   LDX #(channel.1 - SoundState)
   JSR PlayChannel
   LDX #(channel.2 - SoundState)
   JSR PlayChannel
   LDX #(channel.3 - SoundState)
-  ;Fall through
-.IFDEF BasicCompat
   JSR PlayChannel
+  LDX #(channel.4 - SoundState)
+  JSR PlayChannel
+  ;Set memory to what it was
+  LDA Temp+4
+  
+  STA $01
+.IFDEF BasicCompat
   LDX #0
 -
   PLA
   STA Temp,X
   INX
-  CPX #3
+  CPX #5
   BNE -
-  RTS
 .ENDIF
+  RTS
+
 PlayChannel:
 ;Check for Sweep, Virbrato, Tremolo, Percussion Mode
-  LDA channel.0.system,X
+  LDA channel.1.system,X
     PHA
     AND #1
     BEQ +
@@ -314,7 +332,7 @@ PlayChannel:
   JSR _doPerc
 +
 ;Is the note over?
-  DEC channel.0.remain,X
+  DEC channel.1.remain,X
   BEQ +
   RTS
 +
@@ -342,7 +360,7 @@ _nextCommand:
     ADC Temp
     TAY
     PLA
-  STA notelen,Y
+  STA loops.1.notelen,Y
 ;Gear up for next command
   JSR LoopstoRAM
   BPL _nextCommand
@@ -357,7 +375,7 @@ _nextCommand:
   TYA
     PHA
     ;Tying?
-    LDA channel.0.system,X
+    LDA channel.1.system,X
     BMI ++
     JSR _noTie
 ++
@@ -382,11 +400,11 @@ _nextCommand:
   CLC
   ADC Temp
   TAY
-  LDA loops.notelen,Y
+  LDA loops.1.notelen,Y
   TAY
   JSR LoopstoRAM
   TYA
-  STA channel.0.remain,X
+  STA channel.1.remain,X
   RTS
 +
 ;0: Other commands
@@ -395,7 +413,7 @@ _nextCommand:
   BMI +
   ;Octave
   AND #$07
-  STA channel.0.octave,X
+  STA channel.1.octave,X
   JMP _nextCommand
 +
   DEY
@@ -407,32 +425,32 @@ _nextCommand:
   NXT
   TAY
   ;Filter type first
-  LDA channel.0.phase
+  LDA channel.1.phase
   AND #%10000000
-  STA channel.0.phase
+  STA channel.1.phase
   TYA
   AND #%01110000
-  ORA channel.0.phase
-  STA channel.0.phase
+  ORA channel.1.phase
+  STA channel.1.phase
   STA SIDflt.ModeVol
   ;Resonance
-  LDA channel.0.adsr
+  LDA channel.1.adsr
   AND #$0F
-  STA channel.0.adsr
+  STA channel.1.adsr
   TYA
   AND #$0F
   ASL A
   ASL A
   ASL A
   ASL A
-  ORA channel.0.adsr
-  STA channel.0.adsr
+  ORA channel.1.adsr
+  STA channel.1.adsr
   STA SIDflt.ResoEnable
   JMP _nextCommand
 ++
-  LDA channel.0.system,X
+  LDA channel.1.system,X
   ORA #%10000000
-  STA channel.0.system,X
+  STA channel.1.system,X
   JMP _nextCommand
 +
   BNE +
@@ -440,15 +458,15 @@ _nextCommand:
   NXT
   BEQ ++
   ;Sweep on
-  STA channel.0.sweep,X
-  LDA channel.0.system,X
+  STA channel.1.sweep,X
+  LDA channel.1.system,X
   ORA #%00000001
-  STA channel.0.system,X
+  STA channel.1.system,X
   JMP _nextCommand
 ++  ;Sweep off
-  LDA channel.0.system,X
+  LDA channel.1.system,X
   AND #%11111110
-  STA channel.0.system,X
+  STA channel.1.system,X
   JMP _nextCommand
 +
   DEY
@@ -457,17 +475,17 @@ _nextCommand:
   NXT
   BEQ ++
   ;Virbrato on
-  STA channel.0.wobble,X
+  STA channel.1.wobble,X
   AND #$0F
-  STA channel.0.wobtime,X
-  LDA channel.0.system,X
+  STA channel.1.wobtime,X
+  LDA channel.1.system,X
   ORA #%00000110
-  STA channel.0.system,X
+  STA channel.1.system,X
   JMP _nextCommand
 ++  ;Virbrato off
-  LDA channel.0.system,X
+  LDA channel.1.system,X
   AND #%11111001
-  STA channel.0.system,X
+  STA channel.1.system,X
   JMP _nextCommand
 +
   DEY
@@ -484,57 +502,7 @@ _nextCommand:
   DEY
   BNE +
   ;Control/Filter Enables
-  TXA
-  BNE ++
-  ;Channel 0
-  LDA channel.0.adsr
-  AND #$F0
-  STA channel.0.adsr
-  NXT
-  ORA channel.0.adsr
-  STA channel.0.adsr
-  STA SIDflt.ResoEnable
-  JMP _nextCommand
-++
-  ;This one's kinda all over the place
-  NXT
-  TAY
-  ;Ring/Sync
-  LDA channel.0.control,X
-  AND #%11111001
-  STA channel.0.control,X
-  TYA
-  AND #%00000110
-  ORA channel.0.control,X
-  STA channel.0.control,X
-  TYA
-  AND #%00001000
-  BEQ ++
-  ;Channel 3 toggle
-  LDA #%10000000
-  EOR channel.0.phase
-  STA channel.0.phase
-  STA SIDflt.ModeVol
-++
-  ;Percussion Mode
-  LDA channel.0.system,X
-  AND #%10111111
-  STA channel.0.system,X
-  TYA
-  AND #%00000001
-  CLC
-  ROR A
-  ROR A
-  ROR A
-  ORA channel.0.system,X
-  STA channel.0.system,X
-  ;Update SID
-  LDY channel.0.control,X
-  JSR RAMtoIO
-  TYA
-  STA SIDch.0.Control,X
-  JSR IOtoRAM
-  JMP _nextCommand
+  JMP _controlFilter
 +
   DEY
   BNE +
@@ -548,23 +516,23 @@ _nextCommand:
   ASL A
   ASL A
   ASL A
-  STA.w channel.0.phase+1
+  STA.w channel.1.phase+1
   TYA
-  ORA channel.0.phase
+  ORA channel.1.phase
   STA SIDflt.ModeVol
   JMP _nextCommand
 ++
   NXT
-  STA channel.0.adsr,X
+  STA channel.1.adsr,X
   TAY
   NXT
-  STA.w channel.0.adsr+1,X
+  STA.w channel.1.adsr+1,X
     PHA
     JSR RAMtoIO
     PLA
-  STA.w SIDch.0.ADSR+1,X
+  STA.w SIDch.1.ADSR+1,X
   TYA
-  STA SIDch.0.ADSR,X
+  STA SIDch.1.ADSR,X
   JSR IOtoRAM
   JMP _nextCommand
 +
@@ -572,12 +540,12 @@ _nextCommand:
   DEY
   BEQ +
   ;Flip the Test bit
-  LDA channel.0.control,X
+  LDA channel.1.control,X
   TAY
   JSR RAMtoIO
   TYA
   ORA #%00001000
-  STA SIDch.0.Control,X
+  STA SIDch.1.Control,X
   JSR IOtoRAM
 +
   ;Get the phase & wave enables
@@ -586,35 +554,88 @@ _nextCommand:
     ;Splice the wave enables into the control register
     AND #$F0
     TAY
-    LDA channel.0.control,X
+    LDA channel.1.control,X
     AND #$0F
-    STA channel.0.control,X
+    STA channel.1.control,X
     TYA
-    ORA channel.0.control,X
-    STA channel.0.control,X
+    ORA channel.1.control,X
+    STA channel.1.control,X
     TAY
     ;Get the rest of the duty cycle
     NXT
       PHA
       JSR RAMtoIO
       PLA
-    STA SIDch.0.PulseWidth,X
+    STA SIDch.1.PulseWidth,X
     PLA
-  STA.w SIDch.0.PulseWidth+1,X
+  STA.w SIDch.1.PulseWidth+1,X
   TYA
-  STA SIDch.0.Control,X
+  STA SIDch.1.Control,X
+  JSR IOtoRAM
+  JMP _nextCommand
+
+_controlFilter:
+  TXA
+  BNE ++
+  ;Channel 0
+  LDA channel.1.adsr
+  AND #$F0
+  STA channel.1.adsr
+  NXT
+  ORA channel.1.adsr
+  STA channel.1.adsr
+  STA SIDflt.ResoEnable
+  JMP _nextCommand
+++
+  ;This one's kinda all over the place
+  NXT
+  TAY
+  ;Ring/Sync
+  LDA channel.1.control,X
+  AND #%11111001
+  STA channel.1.control,X
+  TYA
+  AND #%00000110
+  ORA channel.1.control,X
+  STA channel.1.control,X
+  TYA
+  AND #%00001000
+  BEQ ++
+  ;Channel 3 toggle
+  LDA #%10000000
+  EOR channel.1.phase
+  STA channel.1.phase
+  STA SIDflt.ModeVol
+++
+  ;Percussion Mode
+  LDA channel.1.system,X
+  AND #%10111111
+  STA channel.1.system,X
+  TYA
+  AND #%00000001
+  CLC
+  ROR A
+  ROR A
+  ROR A
+  ORA channel.1.system,X
+  STA channel.1.system,X
+  ;Update SID
+  LDY channel.1.control,X
+  JSR RAMtoIO
+  TYA
+  STA SIDch.1.Control,X
   JSR IOtoRAM
   JMP _nextCommand
 
 _noTie:
   ;Gate the note off
   ;Get the shadow control register real quick
-  LDA channel.0.control,X
+  LDA channel.1.control,X
   TAY
   JSR RAMtoIO
   TYA
   AND #%11111110
-  STA SIDch.0.Control,X
+  STA SIDch.1.Control,X
   JMP IOtoRAM
 
 _playPercussion:
@@ -626,28 +647,28 @@ _playPercussion:
   TAY
   ;Shadows First
   LDA PercData,Y
-  STA channel.0.freq,X
+  STA channel.1.freq,X
   INY
   LDA PercData,Y
-  STA.w channel.0.freq+1,X
+  STA.w channel.1.freq+1,X
   INY
   LDA PercData,Y
-  STA channel.0.adsr,X
+  STA channel.1.adsr,X
   INY
   LDA PercData,Y
-  STA.w channel.0.adsr+1,X
+  STA.w channel.1.adsr+1,X
   INY
   LDA PercData,Y
-  STA channel.0.phase,X
+  STA channel.1.phase,X
   INY
   LDA PercData,Y
-  STA.w channel.0.phase+1,X
+  STA.w channel.1.phase+1,X
   INY
   LDA PercData,Y
-  STA channel.0.control,X
+  STA channel.1.control,X
   INY
   LDA PercData,Y
-  STA channel.0.octave,X
+  STA channel.1.octave,X
   DEY
   ;True SID next
   JSR RAMtoIO
@@ -655,34 +676,35 @@ _playPercussion:
   DEY
     PHA
     LDA PercData,Y
-    STA.w SIDch.0.PulseWidth+1,X
+    STA.w SIDch.1.PulseWidth+1,X
     DEY
     LDA PercData,Y
-    STA SIDch.0.PulseWidth,X
+    STA SIDch.1.PulseWidth,X
     DEY
     LDA PercData,Y
-    STA.w SIDch.0.ADSR+1,X
+    STA.w SIDch.1.ADSR+1,X
     DEY
     LDA PercData,Y
-    STA SIDch.0.ADSR,X
+    STA SIDch.1.ADSR,X
     DEY
     LDA PercData,Y
-    STA.w SIDch.0.Frequency+1,X
+    STA.w SIDch.1.Frequency+1,X
     DEY
     LDA PercData,Y
-    STA SIDch.0.Frequency,X
+    STA SIDch.1.Frequency,X
     PLA
-  STA SIDch.0.Control,X
+  STA SIDch.1.Control,X
   JMP IOtoRAM
 
 _playNote:
+  ASL A
   TAY
   ;Percussion mode?
-  LDA channel.0.system,X
+  LDA channel.1.system,X
   AND #%01000000
   BNE _playPercussion
   ;Nab the shadow control
-  LDA channel.0.control,X
+  LDA channel.1.control,X
   STA Temp
   ;Get the frequency for this note
   LDA (NoteTable),Y
@@ -694,7 +716,7 @@ _playNote:
   ;Consider the octave
   LDA #7
   SEC
-  SBC channel.0.octave,X
+  SBC channel.1.octave,X
   BEQ +
   ;Shift the note down to the correct octave
   TAY
@@ -707,47 +729,47 @@ _playNote:
   ;Play the note
   JSR RAMtoIO
   LDA Temp+1
-  STA SIDch.0.Frequency,X
+  STA SIDch.1.Frequency,X
   LDA Temp+2
-  STA.w SIDch.0.Frequency+1,X
+  STA.w SIDch.1.Frequency+1,X
   ;Gate on
   LDA Temp
   ORA #%00000001
-  STA SIDch.0.Control,X
+  STA SIDch.1.Control,X
   JSR IOtoRAM
   ;Update the shadows
   LDA Temp+1
-  STA channel.0.freq,X
+  STA channel.1.freq,X
   LDA Temp+2
-  STA.w channel.0.freq+1,X
+  STA.w channel.1.freq+1,X
 -
   RTS
 
 _doPerc:
 ;Cut the note off if it's over time
-  LDA channel.0.octave,X
+  LDA channel.1.octave,X
   BEQ -
-  DEC channel.0.octave,X
+  DEC channel.1.octave,X
   BNE -
   ;Time to cut it
   ;Mind the other bits
-  LDA channel.0.control,X
+  LDA channel.1.control,X
   TAY
   JSR RAMtoIO
   TYA
   AND #$FE
-  STA SIDch.0.Control,X
+  STA SIDch.1.Control,X
   JMP IOtoRAM
 
-_doVirbrato:
-  LDA channel.0.wobble,X
+_doWobble:
+  LDA channel.1.wobble,X
   AND #$F0
   LSR A
   LSR A
   LSR A
   LSR A
   TAY
-  LDA channel.0.system,X
+  LDA channel.1.system,X
   AND #%00000100
   BEQ +
   ;Going down
@@ -762,8 +784,8 @@ _doVirbrato:
   ;Actual SID channel, affect frequency
   TYA
   CLC
-  ADC channel.0.freq,X
-  STA channel.0.freq,X
+  ADC channel.1.freq,X
+  STA channel.1.freq,X
   PHA
     TYA
     BMI ++
@@ -774,47 +796,47 @@ _doVirbrato:
     ;Negative
     LDA #$FF
 +++
-    ADC.w channel.0.freq+1,X
-    STA.w channel.0.freq+1,X
+    ADC.w channel.1.freq+1,X
+    STA.w channel.1.freq+1,X
     TAY
     JSR RAMtoIO
     TYA
-    STA.w SIDch.0.Frequency+1,X
+    STA.w SIDch.1.Frequency+1,X
     PLA
-  STA SIDch.0.Frequency,X
+  STA SIDch.1.Frequency,X
   JSR IOtoRAM
   JMP ++
 + ;Channel 0, affect volume
   TYA
   CLC
-  ADC.w channel.0.phase+1
-  STA channel.0.phase+1
+  ADC.w channel.1.phase+1
+  STA channel.1.phase+1
   LSR A
   LSR A
   LSR A
   LSR A
-  ORA channel.0.phase
+  ORA channel.1.phase
   STA SIDflt.ModeVol
 ++
 ;Adjust the timings
-  DEC channel.0.wobtime,X
+  DEC channel.1.wobtime,X
   BPL +
   ;Switching time!
-  LDA channel.0.system,X
+  LDA channel.1.system,X
   EOR #%00000100
-  STA channel.0.system,X
-  LDA channel.0.wobble,X
+  STA channel.1.system,X
+  LDA channel.1.wobble,X
   AND #$0F
-  STA channel.0.wobtime,X
+  STA channel.1.wobtime,X
 +
   RTS
 
 _doSweep:
-  LDA channel.0.sweep,X
+  LDA channel.1.sweep,X
     PHP
     CLC
-    ADC channel.0.freq,X
-    STA channel.0.freq,X
+    ADC channel.1.freq,X
+    STA channel.1.freq,X
     PLP
   BMI +
   ;True addition
@@ -825,8 +847,8 @@ _doSweep:
   LDA #$FF
 ++
   TAY
-  ADC.w channel.0.freq+1,X
-  STA.w channel.0.freq+1,X
+  ADC.w channel.1.freq+1,X
+  STA.w channel.1.freq+1,X
   ;Over/underflow?
   BMI ++
   BNE +
@@ -845,30 +867,30 @@ _doSweep:
   BPL +
   LDA #$00
 +++
-  STA channel.0.freq,X
-  STA.w channel.0.freq+1,X
+  STA channel.1.freq,X
+  STA.w channel.1.freq+1,X
 +
   TXA
   BNE +
   ;Channel 0, affect filter freq
-  LDA channel.0.freq+1
+  LDA channel.1.freq+1
   ;Different caps
   CMP #$08
   BMI ++
   LDA #$07
-  STA channel.0.freq+1
+  STA channel.1.freq+1
   LDA #$FF
-  STA channel.0.freq
+  STA channel.1.freq
 ++
-  LDA channel.0.freq+1
+  LDA channel.1.freq+1
   AND #$07
-  STA channel.0.freq+1
+  STA channel.1.freq+1
   ;Transfer the filter frequency
-  LDA channel.0.freq
+  LDA channel.1.freq
   STA SIDflt.Frequency
   AND #$F8
   ASL A
-  ORA.w channel.0.freq+1
+  ORA.w channel.1.freq+1
   ROR A
   ROR A
   ROR A
@@ -876,14 +898,14 @@ _doSweep:
   STA.w SIDflt.Frequency+1
   RTS
 + ;Actual SID channel, affect freq
-  LDA channel.0.freq,X
-  LDY.w channel.0.freq+1,X
+  LDA channel.1.freq,X
+  LDY.w channel.1.freq+1,X
     PHA
     JSR RAMtoIO
     PLA
-  STA SIDch.0.Frequency,X
+  STA SIDch.1.Frequency,X
   TYA
-  STA.w SIDch.0.Frequency+1,X
+  STA.w SIDch.1.Frequency+1,X
   JMP IOtoRAM
   
 _doLoop:
@@ -903,18 +925,18 @@ _doLoop:
   ;Set loop
   CLC
   SBC #$02  ;Account for this directive
-  ADC channel.0.now,Y
-  STA loops.loopptr,X
+  ADC channel.1.now,Y
+  STA loops.1.loopptr,X
   LDA #$00
-  ADC.w channel.0.now+1,Y
-  STA.w loops.loopptr+1,X
+  ADC.w channel.1.now+1,Y
+  STA.w loops.1.loopptr+1,X
   RTS
 + ;Goto
   AND #$7F
   BEQ +
   ;End of loop?
     PHA
-    DEC loops.loopcnt,X
+    DEC loops.1.loopcnt,X
     BMI ++
     BNE +
     ;Do not follow
@@ -925,14 +947,14 @@ _doLoop:
 ++
     ;First time
     PLA
-  STA loops.loopcnt,X
-  INC loops.loopcnt,X
+  STA loops.1.loopcnt,X
+  INC loops.1.loopcnt,X
 +
   ;Follow loop
-  LDA loops.loopptr,X
-  STA channel.0.now,Y
-  LDA.w loops.loopptr+1,X
-  STA.w channel.0.now+1,Y
+  LDA loops.1.loopptr,X
+  STA channel.1.now,Y
+  LDA.w loops.1.loopptr+1,X
+  STA.w channel.1.now+1,Y
   TYA
   TAX
   JMP LoopstoRAM
@@ -950,7 +972,7 @@ RAMtoIO:
   TAX
   RTS
 IOLUT:
- .db $19,0,0,__sizeof_SIDVoice_st,0,__sizeof_SIDVoice_st*2
+ .db $19,0,0,_sizeof_SIDVoice_st,0,_sizeof_SIDVoice_st*2
 
 IOtoRAM:
   TXA
@@ -971,7 +993,7 @@ RAMtoLoops:
   TAX
   RTS
 LoopLUT:
- .db 0,__sizeof_LoopLength*16,0,__sizeof_LoopLength*16*2,0,__sizeof_LoopLength*16*3
+ .db 0,_sizeof_LoopLength*16,0,_sizeof_LoopLength*16*2,0,_sizeof_LoopLength*16*3
 
 LoopstoRAM:
   TXA
@@ -983,7 +1005,7 @@ LoopstoRAM:
   TAX
   RTS
 RAMLUT:
- .db 0,__sizeof_MusicChannel,__sizeof_MusicChannel*2,__sizeof_MusicChannel*3,0,0
+ .db 0,_sizeof_MusicChannel,_sizeof_MusicChannel*2,_sizeof_MusicChannel*3,0,0
 
 ;A=New Tempo
 ;Destroys A,X

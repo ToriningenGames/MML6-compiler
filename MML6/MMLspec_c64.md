@@ -37,6 +37,7 @@ Remaining types:
                  xxx: New Octave
                  No byte data
              0011: Tempo change
+                 Changes the global tempo
                  Byte data: BPM
          Music Channels:
              0100: Control
@@ -46,7 +47,7 @@ Remaining types:
                          |||+-- Percussion mode
                          ||+--- Sync
                          |+---- Ring Mod
-                         +----- Channel 3 Direct Out enable
+                         +----- Channel 3 Direct Out enable toggle
                  ```
              0101: ADSR/Envelope
                  Data:

@@ -23,6 +23,7 @@ Remaining types:
                  xx: Channel 1/2 duty
                  Byte data: Channel 3 wave index
              0011: Tempo change
+                 Tempo is local to the channel
                  Byte data: BPM, 0 to append next note (tie)
              0010: Auto Length (for stacatto)
                  Byte data: value to set Counter to, 0 to disable
