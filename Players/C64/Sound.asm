@@ -210,11 +210,12 @@ NewSong:
   DEX
   BPL -
   ;Wipe memory
-  LDX #_sizeof_MusicChannel*3-1
+  LDX #$00
 -
   STA SoundState,X
+  STA SoundState+$0100,X
   DEX
-  BPL -
+  BNE -
   ;Load in the channel pointers
   CLC
   LDY #$00
@@ -324,9 +325,30 @@ PlayChannel:
   BEQ +
   JSR _doPerc
 +
+;The SID suddenly shuts up if you flash the gate too fast.
+;So, we turn it off a few ticks prior to when the next note hits, if we're supposed to.
 ;Is the note over?
   DEC channel.1.remain,X
   BEQ +
+  LDA channel.1.remain,X
+  CMP #$02
+  BNE ++
+  ;Is the next directive a tie?
+  LDA channel.1.now,X
+  STA Temp+1
+  LDA.w channel.1.now+1,X
+  STA Temp+2
+  LDY #$00
+  LDA (Temp+1),Y
+  BNE ++
+  ;Note goes off now
+  LDA channel.1.control,X
+  TAY
+  JSR RAMtoIO
+  TYA
+  STA SIDch.1.Control,X
+  JMP IOtoRAM
+++
   RTS
 +
 _nextCommand:
@@ -356,7 +378,7 @@ _nextCommand:
   STA loops.1.notelen,Y
 ;Gear up for next command
   JSR LoopstoRAM
-  BCC _nextCommand
+  JMP _nextCommand
 ++
   SBC #$10
   BNE ++
@@ -388,16 +410,14 @@ _nextCommand:
   ;Update length
   AND #$0F
   STA Temp
-  JSR RAMtoLoops
   TXA
+  TAY
+  JSR RAMtoLoops
   CLC
   ADC Temp
-  TAY
-  LDA loops.1.notelen,Y
-  TAY
-  JSR LoopstoRAM
-  TYA
-  STA channel.1.remain,X
+  TAX
+  LDA loops.1.notelen,X
+  STA channel.1.remain,Y
   RTS
 +
 ;0: Other commands
@@ -1006,6 +1026,7 @@ RAMtoLoops:
 LoopstoRAM:
   TXA
   CLC
+  ROL A
   ROL A
   ROL A
   TAX

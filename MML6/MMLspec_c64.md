@@ -40,7 +40,7 @@ Remaining types:
                  Changes the global tempo
                  Byte data: BPM
              0000: Tie/Slur
-                 Makes the next note not retrigger the channel, and instead continue playing while the frequency switches. No following data byte
+                 Makes the next note not retrigger the channel, and instead continue playing while the frequency switches. No following data byte. This directive must immediately follow the note to tie.
          Music Channels:
              0100: Control
                  Controls the inter-channel syncing and Percussion mode
