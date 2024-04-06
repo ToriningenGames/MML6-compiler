@@ -5,7 +5,7 @@
 .DEFINE DIVAREA         $8B     ;5 bytes ZP
 .DEFINE NoteTable       $FB     ;2 bytes ZP
 .DEFINE Temp            $2B     ;5 bytes ZP
-.DEFINE SoundState      $2000   ;2 pages, page aligned
+.DEFINE SoundState      $CE00   ;2 pages, page aligned
 
 .STRUCT LoopLength
 notelen db
@@ -44,21 +44,6 @@ Clock           dw
 .ENUM SoundState + $0100
 loops   INSTANCEOF LoopLength 4*16
 .ENDE
-
-.MACRO NXT ISOLATED
-  LDA channel.1.now,X
-  STA Temp+1
-  LDA.w channel.1.now+1,X
-  STA Temp+2
-  STX Temp+3
-  LDX #$00
-  LDA (Temp+1,X)
-  LDX Temp+3
-  INC channel.1.now,X
-  BNE +
-  INC.w channel.1.now+1,X
-+
-.ENDM
 
 ;Useful Constants
 .DEFINE NtscTimer       $0EA157
@@ -118,7 +103,7 @@ SoundInit:
   LDA $DD04
   ASL A
   LDA $DD05
-  ADC $00
+  ADC #$00
   CLI
   ;Possibilities:
           ;60 Hz, PAL sys: about $7f
@@ -231,29 +216,38 @@ NewSong:
   DEX
   BPL -
   ;Load in the channel pointers
+  CLC
   LDY #$00
   LDA (Temp),Y
+  ADC Temp
   STA channel.1.now
   INY
   LDA (Temp),Y
+  ADC Temp+1
   STA.w channel.1.now+1
   INY
   LDA (Temp),Y
+  ADC Temp
   STA channel.2.now
   INY
   LDA (Temp),Y
+  ADC Temp+1
   STA.w channel.2.now+1
   INY
   LDA (Temp),Y
+  ADC Temp
   STA channel.3.now
   INY
   LDA (Temp),Y
+  ADC Temp+1
   STA.w channel.3.now+1
   INY
   LDA (Temp),Y
+  ADC Temp
   STA channel.4.now
   INY
   LDA (Temp),Y
+  ADC Temp+1
   STA.w channel.4.now+1
   ;Make it play next tick
   LDA #$01
@@ -299,7 +293,6 @@ PlayTick:
   JSR PlayChannel
   ;Set memory to what it was
   LDA Temp+4
-  
   STA $01
 .IFDEF BasicCompat
   LDX #0
@@ -338,17 +331,17 @@ PlayChannel:
 +
 _nextCommand:
   ;Note over; read new commands
-  NXT
+  JSR _nextByte
   TAY
   ;What are we being asked to do?
   AND #$F0
   BEQ +
   SEC
-  SBC #$01
+  SBC #$10
   BNE ++
   ;1: Length Change
   ;Get the length
-  NXT
+  JSR _nextByte
 ;Change the targeted length
     PHA
     TYA
@@ -363,9 +356,9 @@ _nextCommand:
   STA loops.1.notelen,Y
 ;Gear up for next command
   JSR LoopstoRAM
-  BPL _nextCommand
+  BCC _nextCommand
 ++
-  SBC #$01
+  SBC #$10
   BNE ++
   ;2: Loop
   JSR _doLoop
@@ -419,10 +412,101 @@ _nextCommand:
   DEY
   BPL +
   ;Tie/Filter mode
+  LDA channel.1.system,X
+  ORA #%10000000
+  STA channel.1.system,X
+  JMP _nextCommand
++
+  BNE +
+  ;Sweep
+  JSR _nextByte
+  BEQ ++
+  ;Sweep on
+  STA channel.1.sweep,X
+  LDA channel.1.system,X
+  ORA #%00000001
+  STA channel.1.system,X
+  JMP _nextCommand
+++  ;Sweep off
+  LDA channel.1.system,X
+  AND #%11111110
+  STA channel.1.system,X
+  JMP _nextCommand
++
+  DEY
+  BNE +
+  ;Virbrato
+  JSR _nextByte
+  BEQ ++
+  ;Virbrato on
+  STA channel.1.wobble,X
+  AND #$0F
+  STA channel.1.wobtime,X
+  LDA channel.1.system,X
+  ORA #%00000110
+  STA channel.1.system,X
+  JMP _nextCommand
+++  ;Virbrato off
+  LDA channel.1.system,X
+  AND #%11111001
+  STA channel.1.system,X
+  JMP _nextCommand
++
+  DEY
+  BNE +
+  ;Tempo
+  TXA
+  TAY
+  JSR _nextByte
+  JSR SetTempo
+  TYA
+  TAX
+  JMP _nextCommand
++
+  DEY
+  BNE +
+  ;Control/Filter Enables
+  JMP _controlFilter
++
+  DEY
+  BNE +
+  ;ADSR/Volume
   TXA
   BNE ++
   ;Channel 0
-  NXT
+  JSR _nextByte
+  TAY
+  ASL A
+  ASL A
+  ASL A
+  ASL A
+  STA.w channel.1.phase+1
+  TYA
+  ORA channel.1.phase
+  STA SIDflt.ModeVol
+  JMP _nextCommand
+++
+  JSR _nextByte
+  STA channel.1.adsr,X
+  TAY
+  JSR _nextByte
+  STA.w channel.1.adsr+1,X
+    PHA
+    JSR RAMtoIO
+    PLA
+  STA.w SIDch.1.ADSR+1,X
+  TYA
+  STA SIDch.1.ADSR,X
+  JSR IOtoRAM
+  JMP _nextCommand
++
+  ;Waveform and Phase
+  DEY
+  BEQ +
+  TXA
+  BNE ++
+  ;Channel 0
+  JSR _nextByte
   TAY
   ;Filter type first
   LDA channel.1.phase
@@ -448,97 +532,6 @@ _nextCommand:
   STA SIDflt.ResoEnable
   JMP _nextCommand
 ++
-  LDA channel.1.system,X
-  ORA #%10000000
-  STA channel.1.system,X
-  JMP _nextCommand
-+
-  BNE +
-  ;Sweep
-  NXT
-  BEQ ++
-  ;Sweep on
-  STA channel.1.sweep,X
-  LDA channel.1.system,X
-  ORA #%00000001
-  STA channel.1.system,X
-  JMP _nextCommand
-++  ;Sweep off
-  LDA channel.1.system,X
-  AND #%11111110
-  STA channel.1.system,X
-  JMP _nextCommand
-+
-  DEY
-  BNE +
-  ;Virbrato
-  NXT
-  BEQ ++
-  ;Virbrato on
-  STA channel.1.wobble,X
-  AND #$0F
-  STA channel.1.wobtime,X
-  LDA channel.1.system,X
-  ORA #%00000110
-  STA channel.1.system,X
-  JMP _nextCommand
-++  ;Virbrato off
-  LDA channel.1.system,X
-  AND #%11111001
-  STA channel.1.system,X
-  JMP _nextCommand
-+
-  DEY
-  BNE +
-  ;Tempo
-  TXA
-  TAY
-  NXT
-  JSR SetTempo
-  TYA
-  TAX
-  JMP _nextCommand
-+
-  DEY
-  BNE +
-  ;Control/Filter Enables
-  JMP _controlFilter
-+
-  DEY
-  BNE +
-  ;ADSR/Volume
-  TXA
-  BNE ++
-  ;Channel 0
-  NXT
-  TAY
-  ASL A
-  ASL A
-  ASL A
-  ASL A
-  STA.w channel.1.phase+1
-  TYA
-  ORA channel.1.phase
-  STA SIDflt.ModeVol
-  JMP _nextCommand
-++
-  NXT
-  STA channel.1.adsr,X
-  TAY
-  NXT
-  STA.w channel.1.adsr+1,X
-    PHA
-    JSR RAMtoIO
-    PLA
-  STA.w SIDch.1.ADSR+1,X
-  TYA
-  STA SIDch.1.ADSR,X
-  JSR IOtoRAM
-  JMP _nextCommand
-+
-  ;Waveform and Phase
-  DEY
-  BEQ +
   ;Flip the Test bit
   LDA channel.1.control,X
   TAY
@@ -549,7 +542,7 @@ _nextCommand:
   JSR IOtoRAM
 +
   ;Get the phase & wave enables
-  NXT
+  JSR _nextByte
     PHA
     ;Splice the wave enables into the control register
     AND #$F0
@@ -562,7 +555,7 @@ _nextCommand:
     STA channel.1.control,X
     TAY
     ;Get the rest of the duty cycle
-    NXT
+    JSR _nextByte
       PHA
       JSR RAMtoIO
       PLA
@@ -581,14 +574,14 @@ _controlFilter:
   LDA channel.1.adsr
   AND #$F0
   STA channel.1.adsr
-  NXT
+  JSR _nextByte
   ORA channel.1.adsr
   STA channel.1.adsr
   STA SIDflt.ResoEnable
   JMP _nextCommand
 ++
   ;This one's kinda all over the place
-  NXT
+  JSR _nextByte
   TAY
   ;Ring/Sync
   LDA channel.1.control,X
@@ -907,61 +900,86 @@ _doSweep:
   TYA
   STA.w SIDch.1.Frequency+1,X
   JMP IOtoRAM
-  
+
 _doLoop:
-  ;X to the loop ram address
-  ;Y takes X's value
+  ;Y to the loop ram address
+  TYA
   AND #$0F
   STA Temp
   TXA
-  TAY
-  JSR RAMtoLoops
-  CLC
-  ADC Temp
+    PHA
+    JSR RAMtoLoops
+    CLC
+    ADC Temp
+    TAY
+    PLA
   TAX
   ;Start or end of loop?
-  NXT
+  JSR _nextByte
+  ADC #$00      ;Set flags according to A
   BMI +
   ;Set loop
+  SBC #$01  ;Account for this directive
   CLC
-  SBC #$02  ;Account for this directive
-  ADC channel.1.now,Y
-  STA loops.1.loopptr,X
+  ADC channel.1.now,X
+  STA loops.1.loopptr,Y
   LDA #$00
-  ADC.w channel.1.now+1,Y
-  STA.w loops.1.loopptr+1,X
+  ADC.w channel.1.now+1,X
+  STA.w loops.1.loopptr+1,Y
   RTS
 + ;Goto
   AND #$7F
   BEQ +
   ;End of loop?
     PHA
+    TXA
+    STY Temp
+    LDX Temp
     DEC loops.1.loopcnt,X
     BMI ++
-    BNE +
+    BNE +++
     ;Do not follow
+    TAX
     PLA
-  TYA
-  TAX
-  JMP LoopstoRAM
+  RTS
 ++
     ;First time
+    STA loops.1.loopcnt,X
+    INC loops.1.loopcnt,X
+    TAX
     PLA
-  STA loops.1.loopcnt,X
-  INC loops.1.loopcnt,X
+  RTS
++++
+    ;Stack align and follow
+    TAX
+    PLA
 +
   ;Follow loop
-  LDA loops.1.loopptr,X
-  STA channel.1.now,Y
-  LDA.w loops.1.loopptr+1,X
-  STA.w channel.1.now+1,Y
-  TYA
-  TAX
-  JMP LoopstoRAM
+  LDA loops.1.loopptr,Y
+  STA channel.1.now,X
+  LDA.w loops.1.loopptr+1,Y
+  STA.w channel.1.now+1,X
+  RTS
+
+_nextByte:
+  LDA channel.1.now,X
+  STA Temp+1
+  LDA.w channel.1.now+1,X
+  STA Temp+2
+  STX Temp+3
+  LDX #$00
+  LDA (Temp+1,X)
+  LDX Temp+3
+  INC channel.1.now,X
+  BNE +
+  INC.w channel.1.now+1,X
++
+  RTS
 
   ;Convert X from memory index to a SID index for this channel
   ;Music Channel memory use is 14 bytes, and one SID channel is 7 bytes
   ;Channel 0 gets a dummy IO address
+  ;All this stuff is hardcoded since the code has to change if the addresses do
 RAMtoIO:
   TXA
   LSR A
@@ -972,16 +990,8 @@ RAMtoIO:
   TAX
   RTS
 IOLUT:
- .db $19,0,0,_sizeof_SIDVoice_st,0,_sizeof_SIDVoice_st*2
-
-IOtoRAM:
-  TXA
-  LSR A
-  LSR A
-  TAX
-  LDA.w RAMLUT-1,X
-  TAX
-  RTS
+;     0   1   -   2   -   3
+ .db $19,$00,$00,$07,$00,$0E
 
 RAMtoLoops:
   TXA
@@ -992,8 +1002,6 @@ RAMtoLoops:
   LDA.w LoopLUT,X
   TAX
   RTS
-LoopLUT:
- .db 0,_sizeof_LoopLength*16,0,_sizeof_LoopLength*16*2,0,_sizeof_LoopLength*16*3
 
 LoopstoRAM:
   TXA
@@ -1005,7 +1013,22 @@ LoopstoRAM:
   TAX
   RTS
 RAMLUT:
- .db 0,_sizeof_MusicChannel,_sizeof_MusicChannel*2,_sizeof_MusicChannel*3,0,0
+;Lp:  0   1   2   3
+ .db $00
+    ;IO:  1   2   -   3   -   -   0
+     .db $0F,$1E,$2D,$2D
+LoopLUT:
+                    ;     0   1   -   2   -   3
+                     .db $00,$40,$00,$80,$00,$C0
+
+IOtoRAM:
+  TXA
+  LSR A
+  LSR A
+  TAX
+  LDA.w RAMLUT+1,X
+  TAX
+  RTS
 
 ;A=New Tempo
 ;Destroys A,X
@@ -1013,7 +1036,7 @@ SetTempo:
 ;Get predefined machine type
   LDX Clock
   STX DIVAREA
-  LDX.w Clock
+  LDX.w Clock+1
   STX DIVAREA+1
   LDX #$0E
   STX DIVAREA+2

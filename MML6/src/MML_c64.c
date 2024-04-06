@@ -90,6 +90,9 @@ int writeMML_c64(MMLStruct* curr, FILE* outfile);
 //Returns how many bytes this one directive will take
 static int entryLen(struct entryData *curr)
 {
+        if (curr->entry == 0 && curr->bytedata == 0 && curr->supp >= 0) {     //Label
+                return 0;
+        }
         if (curr->entry >= 0x30) { //Note/rest
                 return 1;
         }
@@ -111,8 +114,8 @@ static int entryLen(struct entryData *curr)
         if (curr->entry == 0x05) { //ADSR/Volume
                 return inControl ? 2 : 3;
         }
-        if (curr->entry & 0xFE == 0x06) { //Waveform/Phase
-                return 3;
+        if ((curr->entry & 0xFE) == 0x06) { //Waveform/Phase / Filter
+                return inControl ? 2 : 3;
         }
         if (curr->entry == 0x02) { //Virbrato/Tremolo
                 return 2;
@@ -120,10 +123,10 @@ static int entryLen(struct entryData *curr)
         if (curr->entry == 0x01) { //Sweep
                 return 2;
         }
-        if (curr->entry == 0x00) { //Tie/Filter
-                return inControl ? 2 : 1;
+        if (curr->entry == 0x00) { //Tie
+                return 1;
         }
-        return -1;      //Invalid
+        return 0;      //Invalid
 }
 
 static int MMLStructLen(MMLStruct *curr)
@@ -360,10 +363,10 @@ static struct entryData** check(MMLStruct* curr) {
                 if (curr->secondVal == -2) curr->secondVal = 1;
                 int totalLen = 256 / curr->primaryVal * curr->secondVal;
                 //Add notes until the length is satisfactory
-                while (totalLen > 255) {
+                while (totalLen > 256) {
                     thisEnt->entry = (curr->notePitch + 3)<<4;
-                    thisEnt->bytedata = 255;
-                    totalLen -= 255;
+                    thisEnt->bytedata = 0;
+                    totalLen -= 256;
                     thisEnt = add(thisEnt, malloc(sizeof(struct entryData)));
                     thisEnt->entry = 0x00;  //Tie
                     thisEnt->bytedata = -1;
@@ -421,7 +424,7 @@ static struct entryData** check(MMLStruct* curr) {
                         fail(curr->line, curr->column, "invalid filter");
                     if (curr->secondVal >= 0 && curr->primaryVal > 7)
                         fail(curr->line, curr->column, "invalid filter");
-                    thisEnt->entry = 0x00;
+                    thisEnt->entry = 0x05;
                     thisEnt->bytedata = curr->secondVal >= 0 ? curr->secondVal : 0;
                     thisEnt->bytedata |= curr->primaryVal << (curr->secondVal >= 0 ? 4 : 0);
                 } else {
@@ -680,7 +683,7 @@ static int printMML(struct entryData** channels, FILE* outfile) {
             if (!curr->entry && !curr->bytedata && curr->supp != -1)
                 continue;
             fwrite(&curr->entry, 1, 1, outfile);
-            if (entryLen(curr) == 3) fwrite(&curr->bytedata+1, 1, 1, outfile);
+            if (entryLen(curr) == 3) fwrite(((char*)&curr->bytedata)+1, 1, 1, outfile);
             if (entryLen(curr) >= 2) fwrite(&curr->bytedata, 1, 1, outfile);
         }
     }

@@ -39,6 +39,8 @@ Remaining types:
              0011: Tempo change
                  Changes the global tempo
                  Byte data: BPM
+             0000: Tie/Slur
+                 Makes the next note not retrigger the channel, and instead continue playing while the frequency switches. No following data byte
          Music Channels:
              0100: Control
                  Controls the inter-channel syncing and Percussion mode
@@ -78,8 +80,6 @@ Remaining types:
              0001: Sweep
                  Causes a sweep up/down at a given speed.
                  Byte data: The signed frequency difference to apply
-             0000: Tie/Slur
-                 Makes the next note not retrigger the channel, and instead continue playing while the frequency switches. No following data byte
          Control Channel:
              0100: Filter Enables
                  Enables the filter effects on the selected channels
@@ -92,7 +92,16 @@ Remaining types:
                  ```
              0101: Global Volume
                  Byte data: The output volume (between 0 and 15 incl.)
-             011x: ?
+             0110: Filter Mode
+                 Customizes the type of filter applied
+                 Data:
+                 ```%0HBLRRRR
+                      |||++++--- Resonance
+                      ||+------- Enable Low Pass
+                      |+-------- Enable Band Pass
+                      +--------- Enable High Pass
+                 ```
+             0111: ?
              0010: Tremolo
                  Causes a volume wobble.
                  Data:
@@ -103,15 +112,6 @@ Remaining types:
              0001: Filter Frequency Sweep
                  Sweeps the filter frequency up/down at a given speed
                  Byte data: The signed frequency difference to apply
-             0000: Filter Mode
-                 Customizes the type of filter applied
-                 Data:
-                 ```%0HBLRRRR
-                      |||++++--- Resonance
-                      ||+------- Enable Low Pass
-                      |+-------- Enable Band Pass
-                      +--------- Enable High Pass
-                 ```
 
 Header format:
 For each channel:
