@@ -50,7 +50,7 @@ loops   INSTANCEOF LoopLength 4*16
 .DEFINE PalTimer        $0E1816
 .DEFINE DreanTimer      $0EA3F7
 
-.SECTION "Freq Table" FREE ALIGN 2
+.SECTION "Freq Table" FREE BITWINDOW 8
 ;     A     A+    B     C     C+    D     D+    E     F     F+    G     G+
 NtscFreq:
  .dw $70C8,$777D,$7E97,$861E,$8E18,$968B,$9F7F,$A8FB,$B307,$BDAC,$C8F4,$D4E7
@@ -402,7 +402,7 @@ _nextCommand:
     SEC
     SBC #$30
     BEQ ++
-    LSR A
+    SBC #$10
     LSR A
     LSR A
     LSR A
@@ -714,7 +714,6 @@ _playPercussion:
   JMP IOtoRAM
 
 _playNote:
-  ASL A
   TAY
   ;Percussion mode?
   LDA channel.1.system,X

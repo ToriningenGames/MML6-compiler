@@ -362,8 +362,9 @@ static struct entryData** check(MMLStruct* curr) {
                     fail(curr->line, curr->column, "zero-length note");
                 if (curr->secondVal == -2) curr->secondVal = 1;
                 int totalLen = 256 / curr->primaryVal * curr->secondVal;
-                //Add notes until the length is satisfactory
-                while (totalLen > 256) {
+                //C64 prefers ties to rests; accommodate
+                if (totalLen > 256) {
+                    //First note
                     thisEnt->entry = (curr->notePitch + 3)<<4;
                     thisEnt->bytedata = 0;
                     totalLen -= 256;
@@ -371,10 +372,26 @@ static struct entryData** check(MMLStruct* curr) {
                     thisEnt->entry = 0x00;  //Tie
                     thisEnt->bytedata = -1;
                     thisEnt = add(thisEnt, malloc(sizeof(struct entryData)));
+                    //Subsequents are rests
+                    //Add notes until the length is satisfactory
+                    while (totalLen > 256) {
+                        thisEnt->entry = 0x30;
+                        thisEnt->bytedata = 0;
+                        totalLen -= 256;
+                        thisEnt = add(thisEnt, malloc(sizeof(struct entryData)));
+                        thisEnt->entry = 0x00;  //Tie
+                        thisEnt->bytedata = -1;
+                        thisEnt = add(thisEnt, malloc(sizeof(struct entryData)));
+                    }
+                    //One last note
+                    thisEnt->entry = 0x30;
+                    thisEnt->bytedata = (uint8_t)totalLen;
+                } else {
+                    //Normal note
+                    thisEnt->entry = (curr->notePitch + 3)<<4;
+                    thisEnt->bytedata = (uint8_t)totalLen;
                 }
                 //Normal note
-                thisEnt->entry = (curr->notePitch + 3)<<4;
-                thisEnt->bytedata = (uint8_t)totalLen;
                 break;
             case dir_volume:
                 thisEnt->entry = 0x05;
