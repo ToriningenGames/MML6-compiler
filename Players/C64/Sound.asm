@@ -250,12 +250,16 @@ NewSong:
   LDA (Temp),Y
   ADC Temp+1
   STA.w channel.4.now+1
-  ;Make it play next tick
-  LDA #$01
-  STA channel.1.remain
-  STA channel.2.remain
-  STA channel.3.remain
-  STA channel.4.remain
+  ;Make it play over the next ticks
+  ;Stagger the channels so nothing's overwhelmed
+  LDY #$01
+  STY channel.1.remain
+  INY
+  STY channel.2.remain
+  INY
+  STY channel.3.remain
+  INY
+  STY channel.4.remain
   ;Set the tempo to a fine default
   LDA #120
   JMP SetTempo
@@ -396,6 +400,10 @@ _nextCommand:
     BMI ++
     JSR _noTie
 ++
+    ;Turn off tying now.
+    LDA channel.1.system,X
+    AND #$7F
+    STA channel.1.system,X
     PLA
     PHA
     AND #$F0  ;Check for rest (don't play)
