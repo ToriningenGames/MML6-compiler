@@ -369,6 +369,8 @@ _nextCommand:
     TYA
     AND #$0F
     STA Temp
+    ASL Temp
+    ASL Temp
     JSR RAMtoLoops
     TXA
     CLC
@@ -410,6 +412,8 @@ _nextCommand:
   ;Update length
   AND #$0F
   STA Temp
+  ASL Temp
+  ASL Temp
   TXA
   TAY
   JSR RAMtoLoops
@@ -926,6 +930,8 @@ _doLoop:
   TYA
   AND #$0F
   STA Temp
+  ASL Temp
+  ASL Temp
   TXA
     PHA
     JSR RAMtoLoops
@@ -964,11 +970,10 @@ _doLoop:
   RTS
 ++
     ;First time
-    STA loops.1.loopcnt,X
-    INC loops.1.loopcnt,X
     TAX
     PLA
-  RTS
+  STA loops.1.loopcnt,Y
+  BNE +
 +++
     ;Stack align and follow
     TAX

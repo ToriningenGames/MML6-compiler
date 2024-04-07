@@ -507,7 +507,7 @@ static struct entryData* llcollect(struct entryData* curr, struct loopNode* loop
         //Is loop?
         if (inRange(0x20, curr->entry, 0x2F)) {
             //Is loop end?
-            if (curr->bytedata >= 0x80) {
+            if (curr->bytedata & 0x80) {
                 //yes
                 //Annotate loop end
                 loopTree->end = curr;
@@ -535,11 +535,11 @@ static void lpIndAssn(struct loopNode* curr) {
     assert(curr);
     assert(curr->start);
     assert(curr->end);
-    if (curr->start->entry == LOOPCNT)
+    if (curr->start->entry == 0x20)
         curr->start->entry = curr->end->entry;
-    if (curr->end->entry == LOOPCNT)
+    if (curr->end->entry == 0x20)
         curr->end->entry = curr->start->entry;
-    if (curr->start->entry == LOOPCNT) {
+    if (curr->start->entry == 0x20) {
         //Does not have preassigned loop
         uint8_t index = 0;
         //Find first index
