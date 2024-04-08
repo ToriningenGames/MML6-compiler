@@ -306,7 +306,8 @@ struct token* parser(struct string_base* instring) {
                     break;
                 case dir_sweep :
                 case dir_instrument :
-                    curr->isUp = !string->word[i] == '-';
+                    if (string->word[i] == '+') curr->isUp = true;
+                    if (string->word[i] == '-') curr->isUp = false;
                     break;
                 default :
                     fail(string->line, string->column+i, "unexpected '+/-'");

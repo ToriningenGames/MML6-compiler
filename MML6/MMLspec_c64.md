@@ -192,7 +192,7 @@ Meanings:
     S: Filter Sweep (Control Channel)
         Adds a sweep to the resonance frequency of the filter. Takes an optional sign before the base specifier to specify which direction to sweep. More extreme values result in faster sweeps. Signed 8 bit value.
     I: Set instrument (Music Channel)
-        Sets the instrument to use with this channel. The value is a bitfield of 5 bits, enabling in order from lo to hi the waves for Triangle, Saw, Square, Noise, and Test Toggle. Setting test toggle sets the test bit while the wave is changed, resulting in a split-second of no output, and resetting the phases of the waves. An optional specifier is a 12 bit value for the duty cycle of the square wave. If it is not present, the duty will be 50%.
+        Sets the instrument to use with this channel. The value is a bitfield of 4 bits, enabling in order from lo to hi the waves for Triangle, Saw, Square, and Noise. Using "I-" will set the test toggle. Setting test toggle sets the test bit while the wave is changed, resulting in a split-second of no output, and resetting the phases of the waves. An optional specifier is a 12 bit value for the duty cycle of the square wave. If it is not present, the duty will be 50%.
     I: Filter Enables (Control Channel)
         Enables/Disables the filter for the various channels and external input. Bits from lo to hi are Channel 1, 2, 3, and external.
     W: Virbrato (Music Channel)

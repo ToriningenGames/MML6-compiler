@@ -344,7 +344,7 @@ PlayChannel:
   STA Temp+2
   LDY #$00
   LDA (Temp+1),Y
-  BNE ++
+  BEQ ++
   ;Note goes off now
   LDA channel.1.control,X
   TAY
@@ -404,6 +404,9 @@ _nextCommand:
     LDA channel.1.system,X
     AND #$7F
     STA channel.1.system,X
+    LDA channel.1.control,X
+    AND #$FE
+    STA channel.1.control,X
     PLA
     PHA
     AND #$F0  ;Check for rest (don't play)
@@ -443,10 +446,13 @@ _nextCommand:
 +
   DEY
   BPL +
-  ;Tie/Filter mode
+  ;Tie
   LDA channel.1.system,X
   ORA #%10000000
   STA channel.1.system,X
+  LDA channel.1.control,X
+  ORA #%00000001
+  STA channel.1.control,X
   JMP _nextCommand
 +
   BNE +
@@ -790,8 +796,6 @@ _doWobble:
   AND #$F0
   LSR A
   LSR A
-  LSR A
-  LSR A
   TAY
   LDA channel.1.system,X
   AND #%00000100
@@ -856,23 +860,18 @@ _doWobble:
   RTS
 
 _doSweep:
+  LDY #$00
   LDA channel.1.sweep,X
-    PHP
-    CLC
-    ADC channel.1.freq,X
-    STA channel.1.freq,X
-    PLP
-  BMI +
-  ;True addition
-  LDA #$00
-  BEQ ++
+  BPL +
+  ;Actually negative
+  LDY #$FF
 +
-  ;Adding a negative
-  LDA #$FF
-++
-  TAY
-  ADC.w channel.1.freq+1,X
-  STA.w channel.1.freq+1,X
+  CLC
+  ADC channel.1.freq,X
+  STA channel.1.freq,X
+  TYA
+  ADC channel.1.freq+1,X
+  STA channel.1.freq+1,X
   ;Over/underflow?
   BMI ++
   BNE +

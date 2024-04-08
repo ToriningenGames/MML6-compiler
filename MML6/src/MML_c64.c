@@ -406,7 +406,9 @@ static struct entryData** check(MMLStruct* curr) {
                 break;
             case dir_sweep:
                 thisEnt->entry = 0x01;
-                if (!inRange(0, curr->primaryVal, 255))
+                if (!inRange(0, curr->primaryVal, 128))
+                    fail(curr->line, curr->column, "sweep out of range");
+                if (curr->isUp && curr->primaryVal == 128)
                     fail(curr->line, curr->column, "sweep out of range");
                 thisEnt->bytedata = curr->primaryVal;
                 if (!curr->isUp) {
@@ -417,19 +419,19 @@ static struct entryData** check(MMLStruct* curr) {
                 if (!curr->primaryVal) {
                     //Actually a tie
                     if (inControl)
-                        fail(curr->line, curr->column, "Tie within control channel");
+                        warn(curr->line, curr->column, "Tie within control channel");
                     thisEnt->entry = 0;
                     break;
                 }
                 thisEnt->entry = 0x03;
-                if (!inRange(0, curr->primaryVal, 255))
-                fail(curr->line, curr->column, "tempo out of range");
+                if (!inRange(1, curr->primaryVal, 255))
+                    fail(curr->line, curr->column, "tempo out of range");
                 thisEnt->bytedata = curr->primaryVal;
                 break;
             case dir_octave:
                 thisEnt->entry = 0x08;
                 if (!inRange(0, curr->primaryVal, 7))
-                fail(curr->line, curr->column, "octave out of range");
+                    fail(curr->line, curr->column, "octave out of range");
                 thisEnt->entry |= curr->primaryVal;
                 thisEnt->bytedata = 0;
                 break;
@@ -449,7 +451,7 @@ static struct entryData** check(MMLStruct* curr) {
                         fail(curr->line, curr->column, "invalid phase");
                     if (!inRange(0, curr->primaryVal, 15))
                         fail(curr->line, curr->column, "invalid wave spec");
-                    thisEnt->entry = 0x06 + !!(curr->isUp);
+                    thisEnt->entry = 0x06 + !(curr->isUp);
                     thisEnt->bytedata = curr->secondVal >= 0 ? curr->secondVal : 0x0800;
                     thisEnt->bytedata |= (curr->primaryVal & 0x0F) << 12;
                 }
