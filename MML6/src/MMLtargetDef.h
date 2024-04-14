@@ -17,9 +17,9 @@ enum platform { pt_none, pt_self, pt_gameboy, pt_c64 };
 
 enum directive { dir_none, dir_octShift, dir_imply, dir_macro, //You won't see these
     dir_note, dir_tempo, dir_octave, dir_loop, dir_channel, dir_rest, dir_label, //General directives; are the same everywhere
-    dir_instrument, dir_volume, dir_sweep, //Specific directves; meaning and availability differ depending on platform
+    dir_instrument, dir_volume, dir_sweep, dir_tie, //Specific directves; meaning and availability differ depending on platform
     dir_stacatto, //GB-specific directives
-    dir_wobble, dir_control, //SID-specific directives
+    dir_wobble, dir_control, dir_freq, //SID-specific directives
     dir_error = -1 };   //I hope you don't see this
 
 typedef struct token {

@@ -114,8 +114,11 @@ static int entryLen(struct entryData *curr)
         if (curr->entry == 0x05) { //ADSR/Volume
                 return inControl ? 2 : 3;
         }
-        if ((curr->entry & 0xFE) == 0x06) { //Waveform/Phase / Filter
+        if (curr->entry == 0x06) { //Waveform/Phase / Filter Mode
                 return inControl ? 2 : 3;
+        }
+        if (curr->entry == 0x07) { //Waveform/Phase / Filter Freq
+                return 3;
         }
         if (curr->entry == 0x02) { //Virbrato/Tremolo
                 return 2;
@@ -415,6 +418,11 @@ static struct entryData** check(MMLStruct* curr) {
                     thisEnt->bytedata *= -1;
                 }
                 break;
+            case dir_tie:
+                if (inControl)
+                    warn(curr->line, curr->column, "Tie within control channel");
+                thisEnt->entry = 0;
+                break;
             case dir_tempo:
                 if (!curr->primaryVal) {
                     //Actually a tie
@@ -437,15 +445,10 @@ static struct entryData** check(MMLStruct* curr) {
                 break;
             case dir_instrument:
                 if (inControl) {
-                    if (!inRange(-2, curr->secondVal, 15))
-                        fail(curr->line, curr->column, "resonance out of range");
-                    if (!inRange(0, curr->primaryVal, 127))
+                    if (!inRange(0, curr->primaryVal, 15))
                         fail(curr->line, curr->column, "invalid filter");
-                    if (curr->secondVal >= 0 && curr->primaryVal > 7)
-                        fail(curr->line, curr->column, "invalid filter");
-                    thisEnt->entry = 0x05;
-                    thisEnt->bytedata = curr->secondVal >= 0 ? curr->secondVal : 0;
-                    thisEnt->bytedata |= curr->primaryVal << (curr->secondVal >= 0 ? 4 : 0);
+                    thisEnt->entry = 0x04;
+                    thisEnt->bytedata = curr->primaryVal;
                 } else {
                     if (curr->secondVal > 0x0FFF)
                         fail(curr->line, curr->column, "invalid phase");
@@ -465,11 +468,31 @@ static struct entryData** check(MMLStruct* curr) {
                 thisEnt->bytedata = curr->secondVal < 0 ? 0 : curr->secondVal;
                 thisEnt->bytedata |= curr->primaryVal << (curr->secondVal < 0 ? 0 : 4);
                 break;
-            case dir_control:
-                if (!inRange(0, curr->primaryVal, 0x0F))
-                    fail(curr->line, curr->column, "control out of range");
-                thisEnt->entry = 0x04;
+            case dir_freq:
+                if (!inControl)
+                    fail(curr->line, curr->column, "filter frequency spec in music channel");
+                if (!inRange(0, curr->primaryVal, 0x7FF))
+                    fail(curr->line, curr->column, "filter frequency out of range");
+                thisEnt->entry = 0x07;
                 thisEnt->bytedata = curr->primaryVal;
+                break;
+            case dir_control:
+                if (inControl) {
+                    if (!inRange(-2, curr->secondVal, 15))
+                        fail(curr->line, curr->column, "resonance out of range");
+                    if (!inRange(0, curr->primaryVal, 127))
+                        fail(curr->line, curr->column, "invalid filter");
+                    if (curr->secondVal >= 0 && curr->primaryVal > 7)
+                        fail(curr->line, curr->column, "invalid filter");
+                    thisEnt->entry = 0x06;
+                    thisEnt->bytedata = curr->secondVal >= 0 ? curr->secondVal : 0;
+                    thisEnt->bytedata |= curr->primaryVal << (curr->secondVal >= 0 ? 4 : 0);
+                } else {
+                    if (!inRange(0, curr->primaryVal, 0x0F))
+                        fail(curr->line, curr->column, "control out of range");
+                    thisEnt->entry = 0x04;
+                    thisEnt->bytedata = curr->primaryVal;
+                }
                 break;
             case dir_loop:
                 thisEnt->entry = 0x20;

@@ -101,7 +101,8 @@ Remaining types:
                       |+-------- Enable Band Pass
                       +--------- Enable High Pass
                  ```
-             0111: ?
+             0111: Filter Frequency
+                 Sets the frequency the filter filters at. Word data follows
              0010: Tremolo
                  Causes a volume wobble.
                  Data:
@@ -124,6 +125,7 @@ All entries are a character with a number following. Valid characters are:
     R:      Rest
     O:      Octave
     T:      Tempo/Tie
+    ~:      Tie
     []:     Loop
     X:      Channel
     ^:      Imply
@@ -133,6 +135,7 @@ All entries are a character with a number following. Valid characters are:
     W:      Virbrato/Tremolo (Wobble)
     I:      Instrument/Filter Enables
     Q:      Voice Control/Filter Control
+    Z:      Filter Frequency
     
 Numbers immediately follow valid characters, no space, in one of these formats:
     [0-9]:      Decimal literal
@@ -155,6 +158,8 @@ Meanings:
         Numerals following are the same as any of A-G.
     T: Tempo setting/Tie
         Numeral following is the new tempo, in BPM. Maximum BPM is 255. If the BPM specified is 0, the directive instead acts as a tie or slur: the following note doesn't cause a new attack
+    ~: Tie
+        Same as `T0`: a tie or slur
     [: Loop Start
         Numeral following is a label ID to loop back to.
         A dot following allows specifying the particular index to loop with.
@@ -203,6 +208,8 @@ Meanings:
         Sets control values for the given channel. The value is a 4-bit bitfield, whose effects from lo to hi are Percussion mode, Sync, Ring Mod, Ch3 Direct Out Enable. Sync and Ring Mod enable the appropriate bits for the given Channel. Ch3 Direct Out Enable toggles whether Channel 3's unfiltered output is audible. Only Channel 3 may affect this bit. Percussion mode changes how notes are played, from using the user-specified instrument controls to using player-side defined instruments for each note.
     Q: Filter Control (Control Channel)
         Customizes the global filter. The values provided set resonance as a 4-bit value, and bits enabling Low, Band, and High pass around this resonance. When 1 value is specified, the low 4 bits are the resonance, and the upper 4 bits specify the passes, from lo to hi respectively. When a dot specifier is present, the first value specifies the passes as before, and the second value specifes the resonance.
+    Z: Filter Frequency (Control Channel)
+        Sets what frequency the filter is to act upon. The argument is an 11-bit value
 Note on loops:
     A given bracket pairs with the nearest matching bracket i.e. all loops are fully contained
     If one of these has an index specification and the other doesn't, the other inherits that index

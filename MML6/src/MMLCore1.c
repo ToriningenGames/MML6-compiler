@@ -51,6 +51,7 @@ enum directive parseNewDir(char* text) {
     if (*text == 'V') return dir_volume;
     if (*text == 'S') return dir_sweep;
     if (*text == 'T') return dir_tempo;
+    if (*text == '~') return dir_tie;
     if (*text == 'O') return dir_octave;
     if (*text == 'I') return dir_instrument;
     if (*text == 'H') return dir_stacatto;
@@ -64,6 +65,7 @@ enum directive parseNewDir(char* text) {
     if (*text == ':') return dir_label;
     if (*text == 'W') return dir_wobble;
     if (*text == 'Q') return dir_control;
+    if (*text == 'Z') return dir_freq;
     return -1;
 }
 

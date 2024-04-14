@@ -32,6 +32,10 @@ MMLStruct* processMML(MMLStruct* curr) {
             curr->kind = dir_octave;
             curr->primaryVal = octave + abs(curr->primaryVal)*(curr->isUp?1:-1);
         };
+        //Ties don't take an argument
+        if (curr->kind == dir_tie) {
+                continue;
+        }
         //Place implys
         if ((curr->primaryVal == -1 || curr->secondVal == -1) && imply == -1)
             fail(curr->line, curr->column, "no imply before this point");

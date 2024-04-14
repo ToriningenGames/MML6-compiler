@@ -4,8 +4,10 @@
 ;ZP Defaults fit with KERNAL; define BasicCompat to avoid overwriting BASIC vars
 .DEFINE DIVAREA         $8B     ;5 bytes ZP
 .DEFINE NoteTable       $FB     ;2 bytes ZP
-.DEFINE Temp            $2B     ;5 bytes ZP
+.DEFINE Temp            $45     ;5 bytes ZP
+.DEFINE TempSize        5
 .DEFINE SoundState      $CE00   ;2 pages, page aligned
+.DEFINE Shadow          $CDF0
 
 .STRUCT LoopLength
 notelen db
@@ -274,10 +276,10 @@ PlayTick:
   STA Delay
 .IFDEF BasicCompat
   ;Save the state we overwrite
-  LDX #4
+  LDX #TempSize-1
 -
   LDA Temp,X
-  PHA
+  STA Shadow,X
   DEX
   BPL -
 .ENDIF
@@ -300,13 +302,12 @@ PlayTick:
   LDA Temp+4
   STA $01
 .IFDEF BasicCompat
-  LDX #0
+  LDX #TempSize-1
 -
-  PLA
+  LDA Shadow,X
   STA Temp,X
-  INX
-  CPX #5
-  BNE -
+  DEX
+  BPL -
 .ENDIF
   RTS
 
@@ -544,6 +545,36 @@ _nextCommand:
   TXA
   BNE ++
   ;Channel 0
+  ;Filter freq. Save and apply
+  JSR _nextByte
+  STA channel.1.freq
+  STA SIDflt.Frequency
+  JSR _nextByte
+  STA channel.1.freq+1
+  LDA channel.1.freq
+  AND #$F8
+  ASL A
+  ORA.w channel.1.freq+1
+  ROR A
+  ROR A
+  ROR A
+  ROR A
+  STA.w SIDflt.Frequency+1
+  JMP _nextCommand
+++
+  ;Music channel
+  ;Flip the Test bit
+  LDA channel.1.control,X
+  TAY
+  JSR RAMtoIO
+  TYA
+  ORA #%00001000
+  STA SIDch.1.Control,X
+  JSR IOtoRAM
++
+  TXA
+  BNE ++
+  ;Channel 0
   JSR _nextByte
   TAY
   ;Filter type first
@@ -554,6 +585,12 @@ _nextCommand:
   AND #%01110000
   ORA channel.1.phase
   STA channel.1.phase
+  LDA channel.1.phase+1
+  LSR A
+  LSR A
+  LSR A
+  LSR A
+  ORA channel.1.phase
   STA SIDflt.ModeVol
   ;Resonance
   LDA channel.1.adsr
@@ -570,15 +607,7 @@ _nextCommand:
   STA SIDflt.ResoEnable
   JMP _nextCommand
 ++
-  ;Flip the Test bit
-  LDA channel.1.control,X
-  TAY
-  JSR RAMtoIO
-  TYA
-  ORA #%00001000
-  STA SIDch.1.Control,X
-  JSR IOtoRAM
-+
+  ;Music channel
   ;Get the phase & wave enables
   JSR _nextByte
     PHA
@@ -636,6 +665,12 @@ _controlFilter:
   LDA #%10000000
   EOR channel.1.phase
   STA channel.1.phase
+  LDA channel.1.phase+1
+  LSR A
+  LSR A
+  LSR A
+  LSR A
+  ORA channel.1.phase
   STA SIDflt.ModeVol
 ++
   ;Percussion Mode
@@ -772,6 +807,10 @@ _playNote:
   STA channel.1.freq,X
   LDA Temp+2
   STA.w channel.1.freq+1,X
+  ;Restart the wobble
+  LDA channel.1.wobble,X
+  AND #$0F
+  STA channel.1.wobtime,X
 -
   RTS
 
@@ -796,6 +835,8 @@ _doWobble:
   AND #$F0
   LSR A
   LSR A
+  LSR A
+  LSR A
   TAY
   LDA channel.1.system,X
   AND #%00000100
@@ -811,6 +852,8 @@ _doWobble:
   BEQ +
   ;Actual SID channel, affect frequency
   TYA
+  ASL A ;Need a larger effect size
+  ASL A
   CLC
   ADC channel.1.freq,X
   STA channel.1.freq,X
@@ -839,6 +882,23 @@ _doWobble:
   CLC
   ADC.w channel.1.phase+1
   STA channel.1.phase+1
+  ;Catch overflows
+  BCC +
+  ;Overflow if adding
+  TYA
+  AND #$FF
+  BMI +++
+  LDA #$FF
+  STA channel.1.phase+1
++
+  ;Overflow if subtracting
+  TYA
+  AND #$FF
+  BPL +++
+  LDA #$00
+  STA channel.1.phase+1
++++
+  LDA channel.1.phase+1
   LSR A
   LSR A
   LSR A

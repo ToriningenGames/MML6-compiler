@@ -450,6 +450,10 @@ static struct gb_entryData** check(MMLStruct* curr) {
                     thisEnt->bytedata = curr->primaryVal << 4 | curr->secondVal;
                 }
                 break;
+            case dir_tie:
+                thisEnt->entry = 0x03;
+                thisEnt->bytedata = 0;
+                break;
             case dir_tempo:
                 thisEnt->entry = 0x03;
                 if (!inRange(0, curr->primaryVal, 255))
